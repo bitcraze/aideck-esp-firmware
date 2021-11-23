@@ -99,9 +99,10 @@ void app_main(void)
 
     spi_transport_init();
 
-    vTaskDelay(10);
+    vTaskDelay(200);
 
-    test_sink(1000);
+    // test_sink(100);
+    test_echo(100);
 
     while(1) {
         vTaskDelay(1000);

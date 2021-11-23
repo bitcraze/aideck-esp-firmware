@@ -9,6 +9,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
 #include "driver/gpio.h"
 #include "driver/spi_slave.h"
@@ -26,21 +27,25 @@
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
 
+// #define DEBUG(...) printf(__VA_ARGS__)
+#define DEBUG(...)
+
 static char * tx_buffer;
 static char * rx_buffer;
 
-static xSemaphoreHandle gap_rtt_event;
 static xQueueHandle tx_queue;
 static xQueueHandle rx_queue;
-static xQueueSetHandle transport_queue_set;
-static xSemaphoreHandle transfer_done;
+
+static EventGroupHandle_t task_event;
+
+#define TASK_EVENT (1<<0)
 
 static TaskHandle_t spi_task_handle;
 
 void IRAM_ATTR gap_rtt_enabled_handler(void * _param) {
     int task_woken = 0;
 
-    xSemaphoreGiveFromISR(gap_rtt_event, &task_woken);
+    xEventGroupSetBitsFromISR(task_event, TASK_EVENT, &task_woken);
 
     portYIELD_FROM_ISR(task_woken);
 }
@@ -52,25 +57,24 @@ static IRAM_ATTR void spi_post_setup(struct spi_slave_transaction_t * _transacti
 static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transaction) {
     gpio_set_level(ESP_RTT_GPIO, 0);
 
-    int task_woken = 0;
-
-    xSemaphoreGiveFromISR(transfer_done, &task_woken);
-
-    portYIELD_FROM_ISR(task_woken);
+static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transaction) {
+    gpio_set_level(ESP_RTT_GPIO, 0);
 }
 
 static void spi_task(void* _param) {
     static spi_transport_packet_t packet;
 
     while(1) {
-        // Wait for either gap to request a transfer or a TX packet to be ready
-        xQueueSelectFromSet(transport_queue_set, portMAX_DELAY);
-
-        // if we where unlocked by gap_rtt, make sure to take the semaphore so that it can be given again
-        xSemaphoreTake(gap_rtt_event, 0);
+        if (uxQueueMessagesWaiting(tx_queue) == 0) {
+            DEBUG("Waiting for events ...\n");
+            int bits = xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
+            // xEventGroupClearBits(task_event, TASK_EVENT);
+            printf("Event! %02x\n", bits);
+        }
 
         // Check if we can send a packet
         if (xQueueReceive(tx_queue, &packet, 0) == pdTRUE) {
+            DEBUG("Some data to send ...\n");
             // Set the length byte and copy the packet to the TX buffer
             tx_buffer[0] = packet.length;
             memcpy(&tx_buffer[1], packet.data, packet.length);
@@ -79,6 +83,8 @@ static void spi_task(void* _param) {
             tx_buffer[0] = 0;
         }
 
+        DEBUG("About to send %d bytes\n", tx_buffer[0]);
+
         // Trigger the transfer!
         spi_slave_transaction_t transaction = {
             .length = SPI_BUFFER_LEN*8,
@@ -86,23 +92,19 @@ static void spi_task(void* _param) {
             .rx_buffer = rx_buffer,
         };
 
-        // printf("Transaction ...\n");
+        DEBUG("Transaction ...\n");
         spi_slave_transmit(VSPI_HOST, &transaction, portMAX_DELAY);
 
-        xSemaphoreTake(transfer_done, portMAX_DELAY);
+        DEBUG("Transferred: %dB\n", transaction.trans_len/8);
 
-        // printf("Transferred: %d\n", transaction.trans_len);
+        int len  = rx_buffer[0];
+        DEBUG("Rx[%d]\n", rx_buffer[0]);
+        for (int i=0; i<len; i++) {
+            DEBUG(" %02x", rx_buffer[i+1]);
+        }
+        DEBUG("\n");
 
-        // int len  = rx_buffer[0];
-        // printf("Rx[%d]", rx_buffer[0]);
-        // for (int i=0; i<len; i++) {
-        //     printf(" %02x", rx_buffer[i+1]);
-        // }
-        // printf(" | ");
-        // for (int i=len; i<len+10; i++) {
-        //     printf(" %02x", rx_buffer[i+1]);
-        // }
-        // printf("\n");
+        // vTaskDelay(1);
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_buffer[0] != 0) {
@@ -117,14 +119,10 @@ void spi_transport_init() {
     printf("Initializing the SPI transport!\n");
 
     // Setting up synchronization items
-    gap_rtt_event = xSemaphoreCreateBinary();
     tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof(spi_transport_packet_t));
     rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(spi_transport_packet_t));
-    transfer_done = xSemaphoreCreateBinary();
 
-    transport_queue_set = xQueueCreateSet(1 + TX_QUEUE_LENGTH);
-    xQueueAddToSet(gap_rtt_event, transport_queue_set);
-    xQueueAddToSet(tx_queue, transport_queue_set);
+    task_event = xEventGroupCreate();
 
     // Setting up GPIOs
     gpio_config_t gap_rtt_conf = {
@@ -167,22 +165,11 @@ void spi_transport_init() {
 
     // Launching SPI communication task
     xTaskCreate(spi_task, "SPI transport", 10000, NULL, 1, &spi_task_handle);    
-
-
-    // vTaskDelay(500);
-
-    // xSemaphoreGive(gap_rtt_event);
-
-    // while (1) {
-    //     int value = gpio_get_level(GAP_RTT_GPIO);
-    //     printf("Pin value: %d\n", value);
-
-    //     vTaskDelay(100);
-    // }
 }
 
 void spi_transport_send(const spi_transport_packet_t *packet) {
     xQueueSend(tx_queue, packet, portMAX_DELAY);
+    xEventGroupSetBits(task_event, TASK_EVENT);
 }
 
 void spi_transport_receive(spi_transport_packet_t *packet) {
