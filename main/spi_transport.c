@@ -50,12 +50,20 @@ void IRAM_ATTR gap_rtt_enabled_handler(void * _param) {
     portYIELD_FROM_ISR(task_woken);
 }
 
+volatile int plop;
 static IRAM_ATTR void spi_post_setup(struct spi_slave_transaction_t * _transaction) {
     gpio_set_level(ESP_RTT_GPIO, 1);
+
+    // for (int i=0; i<1000; i++) {
+    //     plop = i;
+    // }
+
+    // gpio_set_level(ESP_RTT_GPIO, 0);
 }
 
-static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transaction) {
+static IRAM_ATTR void  spi_transaction_started_handler(void * _param) {
     gpio_set_level(ESP_RTT_GPIO, 0);
+}
 
 static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transaction) {
     gpio_set_level(ESP_RTT_GPIO, 0);
@@ -69,7 +77,7 @@ static void spi_task(void* _param) {
             DEBUG("Waiting for events ...\n");
             int bits = xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
             // xEventGroupClearBits(task_event, TASK_EVENT);
-            printf("Event! %02x\n", bits);
+            DEBUG("Event! %02x\n", bits);
         }
 
         // Check if we can send a packet
@@ -105,6 +113,10 @@ static void spi_task(void* _param) {
         DEBUG("\n");
 
         // vTaskDelay(1);
+        for (int i=0; i<10000; i++) {
+            plop = i;
+        }
+
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_buffer[0] != 0) {
@@ -133,6 +145,15 @@ void spi_transport_init() {
     gpio_config(&gap_rtt_conf);
     gpio_isr_handler_add(GAP_RTT_GPIO, gap_rtt_enabled_handler, NULL);
     gpio_intr_enable(GAP_RTT_GPIO);
+
+    gpio_config_t spi_cs_int_config = {
+        .intr_type = GPIO_INTR_NEGEDGE,
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = (1ull<<SPI_CS_GPIO)
+    };
+    gpio_config(&spi_cs_int_config);
+    gpio_isr_handler_add(SPI_CS_GPIO, spi_transaction_started_handler, NULL);
+    gpio_intr_enable(SPI_CS_GPIO);
 
     gpio_config_t esp_rtt_conf = {
         .mode = GPIO_MODE_OUTPUT,
