@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define SPI_TRANSPORT_MTU 255
+#define SPI_TRANSPORT_MTU 1022
 
 typedef struct {
     size_t length;

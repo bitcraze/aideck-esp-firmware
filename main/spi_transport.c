@@ -22,7 +22,7 @@
 #define SPI_MISO_GPIO 23
 #define SPI_SCLK_GPIO 18
 
-#define SPI_BUFFER_LEN (SPI_TRANSPORT_MTU + 1)
+#define SPI_BUFFER_LEN (SPI_TRANSPORT_MTU + 2)
 
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
@@ -79,7 +79,8 @@ static void spi_task(void* _param) {
             DEBUG("Some data to send ...\n");
             // Set the length byte and copy the packet to the TX buffer
             tx_buffer[0] = packet.length;
-            memcpy(&tx_buffer[1], packet.data, packet.length);
+            tx_buffer[1] = packet.length >> 8;
+            memcpy(&tx_buffer[2], packet.data, packet.length);
         } else {
             // Nothing to send, length byte=0
             tx_buffer[0] = 0;
@@ -99,17 +100,17 @@ static void spi_task(void* _param) {
 
         DEBUG("Transferred: %dB\n", transaction.trans_len/8);
 
-        int len  = rx_buffer[0];
+        int rx_len  = rx_buffer[0] + (((int)rx_buffer[1]) << 8);
         DEBUG("Rx[%d]\n", rx_buffer[0]);
-        for (int i=0; i<len; i++) {
+        for (int i=0; i<rx_len; i++) {
             DEBUG(" %02x", rx_buffer[i+1]);
         }
         DEBUG("\n");
 
         // If there is some data received, push the packet in the RX queue!
-        if (rx_buffer[0] != 0) {
-            packet.length = rx_buffer[0];
-            memcpy(packet.data, &rx_buffer[1], packet.length);
+        if (rx_len != 0) {
+            packet.length = rx_len;
+            memcpy(packet.data, &rx_buffer[2], packet.length);
             xQueueSend(rx_queue, &packet, portMAX_DELAY);
         }
     }
