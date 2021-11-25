@@ -13,6 +13,7 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "driver/gpio.h"
+#include "esp_log.h"
 
 #include "spi_transport.h"
 
@@ -21,6 +22,10 @@ void test_echo(int count) {
 
     printf("Testing %d max-size pings ...\n", count);
 
+    packet.length = SPI_TRANSPORT_MTU;
+    packet.data[0] = 0x01;
+    spi_transport_send(&packet);
+
     int start  = xTaskGetTickCount();
     for (int i=0; i<100; i++) {
         packet.length = 64;
@@ -28,6 +33,9 @@ void test_echo(int count) {
         spi_transport_send(&packet);
         spi_transport_receive(&packet);
     }
+
+    spi_transport_receive(&packet);
+
     int stop = xTaskGetTickCount();
 
     int ticks = stop - start;
@@ -44,7 +52,7 @@ void test_source() {
     packet.length = 10;
     packet.data[0] = 0x02;
     packet.data[1] = 100;
-    packet.data[2] = 10;
+    packet.data[2] = 62;
 
     spi_transport_send(&packet);
 
@@ -61,7 +69,7 @@ void test_sink(int count) {
 
     int start  = xTaskGetTickCount();
     for (int i=0; i<count; i++) {
-        packet.length = 64;
+        packet.length = SPI_TRANSPORT_MTU;
         packet.data[0] = 0x00;
         spi_transport_send(&packet);
     }
@@ -70,11 +78,20 @@ void test_sink(int count) {
     int ticks = stop - start;
     float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
     float pk_per_seconds = count / runtime;
-    printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * 64);
+    printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * SPI_TRANSPORT_MTU);
+}
+
+int my_vprintf(const char * fmt, va_list ap) {
+    int len = vprintf("Hello: ", ap);
+    len += vprintf(fmt, ap);
+    return len;
 }
 
 void app_main(void)
 {
+
+    esp_log_set_vprintf(my_vprintf);
+
     printf("Hello world!\n");
 
     /* Print chip information */
@@ -101,8 +118,9 @@ void app_main(void)
 
     vTaskDelay(200);
 
-    // test_sink(100);
-    test_echo(100);
+    test_sink(10000);
+    // test_echo(100);
+    // test_source();
 
     while(1) {
         vTaskDelay(1000);

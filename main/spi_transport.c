@@ -53,12 +53,6 @@ void IRAM_ATTR gap_rtt_enabled_handler(void * _param) {
 volatile int plop;
 static IRAM_ATTR void spi_post_setup(struct spi_slave_transaction_t * _transaction) {
     gpio_set_level(ESP_RTT_GPIO, 1);
-
-    // for (int i=0; i<1000; i++) {
-    //     plop = i;
-    // }
-
-    // gpio_set_level(ESP_RTT_GPIO, 0);
 }
 
 static IRAM_ATTR void  spi_transaction_started_handler(void * _param) {
@@ -111,12 +105,6 @@ static void spi_task(void* _param) {
             DEBUG(" %02x", rx_buffer[i+1]);
         }
         DEBUG("\n");
-
-        // vTaskDelay(1);
-        for (int i=0; i<10000; i++) {
-            plop = i;
-        }
-
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_buffer[0] != 0) {
