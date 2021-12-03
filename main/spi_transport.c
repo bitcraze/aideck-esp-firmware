@@ -13,6 +13,7 @@
 
 #include "driver/gpio.h"
 #include "driver/spi_slave.h"
+#include "esp_log.h"
 
 #define GAP_RTT_GPIO 32
 #define ESP_RTT_GPIO 2
@@ -117,7 +118,6 @@ static void spi_task(void* _param) {
 }
 
 void spi_transport_init() {
-    printf("Initializing the SPI transport!\n");
 
     // Setting up synchronization items
     tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof(spi_transport_packet_t));
@@ -174,7 +174,8 @@ void spi_transport_init() {
     rx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
 
     // Launching SPI communication task
-    xTaskCreate(spi_task, "SPI transport", 10000, NULL, 1, &spi_task_handle);    
+    xTaskCreate(spi_task, "SPI transport", 10000, NULL, 1, &spi_task_handle);
+    ESP_LOGI("SPI", "Transport initialized");
 }
 
 void spi_transport_send(const spi_transport_packet_t *packet) {

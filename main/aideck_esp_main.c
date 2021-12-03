@@ -19,6 +19,8 @@
 #include "spi_transport.h"
 #include "uart_transport.h"
 #include "router.h"
+#include "com.h"
+#include "test.h"
 
 /* The LED is connected on GPIO */
 #define BLINK_GPIO 4
@@ -169,16 +171,15 @@ int a = 1;
 
 void app_main(void)
 {
-
-
-
-
-    esp_log_level_set("SPI", ESP_LOG_DEBUG);
+    // Menuconfig option set to DEBUG
+    esp_log_level_set("*", ESP_LOG_ERROR);
+    esp_log_level_set("SPI", ESP_LOG_INFO);
+    esp_log_level_set("UART", ESP_LOG_INFO);
+    esp_log_level_set("SYS", ESP_LOG_INFO);
+    esp_log_level_set("ROUTER", ESP_LOG_DEBUG);
+    esp_log_level_set("COM", ESP_LOG_INFO);
+    esp_log_level_set("TEST", ESP_LOG_INFO);
     //esp_log_set_vprintf(my_vprintf);
-
-    ESP_LOGW("SPI", "Initializing the SPI transport!\n");
-
-    printf("Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());
 
     gpio_pad_select_gpio(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
@@ -189,26 +190,34 @@ void app_main(void)
     gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
 
     spi_transport_init();
-    //test_echo(1);
 
-        const uart_config_t uart_config = {
-        .baud_rate = 115200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        //.source_clk = UART_SCLK_APB,
+    vTaskDelay(50);
+
+    const uart_config_t uart_config = {
+      .baud_rate = 115200,
+      .data_bits = UART_DATA_8_BITS,
+      .parity = UART_PARITY_DISABLE,
+      .stop_bits = UART_STOP_BITS_1,
+      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
     // We won't use a buffer for sending data.
     uart_driver_install(UART_NUM_1, 1000, 1000, 0, NULL, 0);
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, 0, 25, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
+    ESP_LOGI("SYS", "\n\n -- Starting up --\n");
+    ESP_LOGI("SYS", "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
+
     uart_transport_init();
+
+    com_init();
 
     router_init();
 
     //test_uart();
+
+    test_init();
+
 
     vTaskDelay(200);
 

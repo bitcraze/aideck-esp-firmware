@@ -23,15 +23,12 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 //#define DEBUG(...)
 
-//static char * tx_buffer;
-//static char * rx_buffer;
 
 static xQueueHandle tx_queue;
 static xQueueHandle rx_queue;
 
 static uart_transport_packet_t txp;
 static uart_transport_packet_t rxp;
-
 
 static EventGroupHandle_t evGroup;
 
@@ -44,19 +41,33 @@ static EventGroupHandle_t evGroup;
 
 static void uart_tx_task(void* _param) {
   uint8_t ctr[] = {0xFF, 0x00};
-  EventBits_t evBits;
+  EventBits_t evBits = 0;
+
+     // We need to hold off here to make sure that the RX task
+    // has started up and is waiting for chars, otherwise we might send
+    // CTR and miss CTS (which means that the STM32 will stop sending CTS
+    // too early and we cannot sync)
+    vTaskDelay(100);
+
+    do {
+      uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
+      vTaskDelay(10);
+      evBits = xEventGroupGetBits(evGroup);
+    } while ((evBits & CTS_EVENT) != CTS_EVENT);
+
+
   while(1) {
     // If we have nothing to send then wait, either for something to be
     // queued or for a request to send CTR
     if (uxQueueMessagesWaiting(tx_queue) == 0) {
-      printf("Waiting for CTR/TXQ\n");
+      ESP_LOGD("UART", "Waiting for CTR/TXQ");
       evBits = xEventGroupWaitBits(evGroup,
                                 CTR_EVENT | TXQ_EVENT,
                                 pdTRUE, // Clear bits before returning
                                 pdFALSE, // Wait for any bit
                                 portMAX_DELAY);
       if ((evBits & CTR_EVENT) == CTR_EVENT) {
-        printf("Sent CTR\n");
+        ESP_LOGD("UART", "Sent CTR");
         uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
       }
     }
@@ -65,58 +76,49 @@ static void uart_tx_task(void* _param) {
       // Dequeue and wait for either CTS or CTR
       xQueueReceive(tx_queue, &txp, 0);
       do {
-        gpio_set_level(BLINK_GPIO, 0);
-        printf("Waiting for CTS/CTR\n");
+        ESP_LOGD("UART", "Waiting for CTR/CTS");
         evBits = xEventGroupWaitBits(evGroup,
                                 CTR_EVENT | CTS_EVENT,
                                 pdTRUE, // Clear bits before returning
                                 pdFALSE, // Wait for any bit
                                 portMAX_DELAY);
         if ((evBits & CTR_EVENT) == CTR_EVENT) {
-          printf("Sent CTR\n");
+          ESP_LOGD("UART", "Sent CTR");
           uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
         }       
       } while ((evBits & CTS_EVENT) != CTS_EVENT);
-      printf("Sending data!\n");
-      txp.magic = 0xFF;
+      ESP_LOGD("UART", "Sending packet");
+      txp.start = 0xFF;
       uart_write_bytes(UART_NUM_0, &txp, txp.length+2);
     }      
   }
 }
 
-static uint8_t magic;
-static uint8_t firstCTS[] = {0xFF, 0x00};
 
 static void uart_rx_task(void* _param) {
-
-    vTaskDelay(1000);
-    
-    xEventGroupSetBits(evGroup, CTR_EVENT);
-    printf("Trigger CTR, we're starting up!\n");
 
     while(1) {
         
         do {
-          uart_read_bytes(UART_NUM_0, &magic, 1, (TickType_t)portMAX_DELAY);
-        } while (magic != 0xFF);
+          uart_read_bytes(UART_NUM_0, &rxp.start, 1, (TickType_t)portMAX_DELAY);
+        } while (rxp.start != 0xFF);
 
         uart_read_bytes(UART_NUM_0, &rxp.length, 1, (TickType_t)portMAX_DELAY);
 
         if (rxp.length == 0) {
-          printf("We got CTS on serial\n");
+          ESP_LOGD("UART", "Received CTS");
           xEventGroupSetBits(evGroup, CTS_EVENT);
         } else {
           uart_read_bytes(UART_NUM_0, rxp.data, rxp.length, (TickType_t)portMAX_DELAY);
+          ESP_LOGD("UART", "Received packet");
           // Post on RX queue and send flow control
           xQueueSend(rx_queue, &rxp, portMAX_DELAY);
-          printf("Trigger CTR, we've sent a packet!\n");
           xEventGroupSetBits(evGroup, CTR_EVENT);
         }
     }
 }
 
 void uart_transport_init() {
-    //printf("Initializing the SPI transport!\n");
 
     // Setting up synchronization items
     tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof(uart_transport_packet_t));
@@ -145,7 +147,7 @@ void uart_transport_init() {
     xTaskCreate(uart_tx_task, "UART TX transport", 10000, NULL, 1, NULL);
     xTaskCreate(uart_rx_task, "UART RX transport", 10000, NULL, 1, NULL);
 
-    //ESP_LOGI("TUART", "UART transport initialized\n");
+    ESP_LOGI("UART", "Transport initialized");
 }
 
 void uart_transport_send(const uart_transport_packet_t *packet) {
