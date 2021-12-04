@@ -14,13 +14,16 @@
 #include "esp_spi_flash.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
+#include "nvs_flash.h"
 #include "esp_log.h"
+#include "esp_event.h"
 
 #include "spi_transport.h"
 #include "uart_transport.h"
 #include "router.h"
 #include "com.h"
 #include "test.h"
+#include "wifi.h"
 
 /* The LED is connected on GPIO */
 #define BLINK_GPIO 4
@@ -179,7 +182,11 @@ void app_main(void)
     esp_log_level_set("ROUTER", ESP_LOG_DEBUG);
     esp_log_level_set("COM", ESP_LOG_INFO);
     esp_log_level_set("TEST", ESP_LOG_INFO);
+    esp_log_level_set("WIFI", ESP_LOG_DEBUG);
     //esp_log_set_vprintf(my_vprintf);
+
+    ESP_ERROR_CHECK(nvs_flash_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     gpio_pad_select_gpio(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
@@ -217,6 +224,8 @@ void app_main(void)
     //test_uart();
 
     test_init();
+
+    wifi_init();
 
 
     vTaskDelay(200);

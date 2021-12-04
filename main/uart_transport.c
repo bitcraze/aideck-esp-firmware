@@ -112,8 +112,14 @@ static void uart_rx_task(void* _param) {
           uart_read_bytes(UART_NUM_0, rxp.data, rxp.length, (TickType_t)portMAX_DELAY);
           ESP_LOGD("UART", "Received packet");
           // Post on RX queue and send flow control
-          xQueueSend(rx_queue, &rxp, portMAX_DELAY);
-          xEventGroupSetBits(evGroup, CTR_EVENT);
+          // Optimize a bit here
+          if (uxQueueSpacesAvailable(rx_queue) > 0) {
+            xEventGroupSetBits(evGroup, CTR_EVENT);
+            xQueueSend(rx_queue, &rxp, portMAX_DELAY);
+          } else {
+            xQueueSend(rx_queue, &rxp, portMAX_DELAY);
+            xEventGroupSetBits(evGroup, CTR_EVENT);
+          }
         }
     }
 }
