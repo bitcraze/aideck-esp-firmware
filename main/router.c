@@ -10,6 +10,7 @@
 #include "freertos/event_groups.h"
 #include "esp_log.h"
 
+#include "routing_info.h"
 #include "spi_transport.h"
 #include "uart_transport.h"
 #include "com.h"
@@ -21,6 +22,8 @@ static uart_transport_packet_t cf_txp;
 
 static esp_packet_t esp_rxp;
 static esp_packet_t esp_txp;
+
+static esp_packet_t esp_gap8_txp;
 
 static void router_from_gap8(void* _param) {
 
@@ -38,6 +41,13 @@ static void router_from_gap8(void* _param) {
           memcpy(cf_txp.data, gap8_rxp.data, cf_txp.length);
           uart_transport_send(&cf_txp);
           break;
+        case ESP32_TARGET:
+          ESP_LOGD("ROUTER", "GAP8 [0x%02X] -> ESP32 [0x%02X] (%u)", routable->src, routable->dst, routable->length);
+          // We need to split up the package here!
+          esp_gap8_txp.length = gap8_rxp.length;
+          memcpy(esp_gap8_txp.data, gap8_rxp.data, esp_gap8_txp.length);
+          com_router_post_packet(&esp_gap8_txp);
+          break;          
         default:
           ESP_LOGW("ROUTER", "Cannot from GAP8 to [0x%02X]", (routable->dst >> 4));
       }

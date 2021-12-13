@@ -179,10 +179,10 @@ void app_main(void)
     esp_log_level_set("SPI", ESP_LOG_INFO);
     esp_log_level_set("UART", ESP_LOG_INFO);
     esp_log_level_set("SYS", ESP_LOG_INFO);
-    esp_log_level_set("ROUTER", ESP_LOG_DEBUG);
+    esp_log_level_set("ROUTER", ESP_LOG_INFO);
     esp_log_level_set("COM", ESP_LOG_INFO);
     esp_log_level_set("TEST", ESP_LOG_INFO);
-    esp_log_level_set("WIFI", ESP_LOG_DEBUG);
+    esp_log_level_set("WIFI", ESP_LOG_INFO);
     //esp_log_set_vprintf(my_vprintf);
 
     ESP_ERROR_CHECK(nvs_flash_init());

@@ -28,7 +28,7 @@
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
 
-// #define DEBUG(...) printf(__VA_ARGS__)
+//#define DEBUG(...) ESP_LOGI("SPI", __VA_ARGS__)
 #define DEBUG(...)
 
 static char * tx_buffer;
@@ -85,9 +85,10 @@ static void spi_task(void* _param) {
         } else {
             // Nothing to send, length byte=0
             tx_buffer[0] = 0;
+            tx_buffer[1] = 0;
         }
 
-        DEBUG("About to send %d bytes\n", tx_buffer[0]);
+        DEBUG("About to send %d bytes\n", tx_buffer[0] | (tx_buffer[1] << 8));
 
         // Trigger the transfer!
         spi_slave_transaction_t transaction = {

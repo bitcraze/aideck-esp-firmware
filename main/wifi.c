@@ -20,6 +20,7 @@
 #include "lwip/sockets.h"
 #include <lwip/netdb.h>
 
+#include "routing_info.h"
 #include "com.h"
 
 static esp_routable_packet_t rxp;
@@ -53,6 +54,18 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
     case SYSTEM_EVENT_STA_GOT_IP:
       ESP_LOGI(TAG, "got ip:%s",
                 ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
+
+      txp.src = MAKE_ROUTE(ESP32, WIFI_CTRL);
+      txp.dst = MAKE_ROUTE(GAP8, WIFI_CTRL);
+      txp.data[0] = 0x21; // WiFi connected
+      memcpy(&txp.data[1], &event->event_info.got_ip.ip_info.ip.addr, sizeof(uint32_t));
+      txp.length = 3 + sizeof(uint32_t);
+
+      ESP_LOGI(TAG, "0x%04X", (uint32_t) event->event_info.got_ip.ip_info.ip.addr);
+
+      // TODO: We should probably not block here...
+      com_send_blocking(&txp);
+
       xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
       break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -80,7 +93,7 @@ static void wifi_init_sta(const char * ssid, const char * key)
 {
   s_wifi_event_group = xEventGroupCreate();
 
-  tcpip_adapter_init();
+  //tcpip_adapter_init();
   ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL) );
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -128,8 +141,132 @@ static void wifi_ctrl(void* _param) {
   }    
 }
 
+void wifi_bind_socket() {
+  char addr_str[128];
+  int addr_family;
+  int ip_protocol;
+  struct sockaddr_in destAddr;
+  destAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  destAddr.sin_family = AF_INET;
+  destAddr.sin_port = htons(5000);
+  addr_family = AF_INET;
+  ip_protocol = IPPROTO_IP;
+  inet_ntoa_r(destAddr.sin_addr, addr_str, sizeof(addr_str) - 1);
+    sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+  if (sock < 0) {
+    ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+  }
+  ESP_LOGI(TAG, "Socket created");
+
+  int err = bind(sock, (struct sockaddr *)&destAddr, sizeof(destAddr));
+  if (err != 0) {
+    ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+  }
+  ESP_LOGI(TAG, "Socket binded");
+
+  err = listen(sock, 1);
+  if (err != 0) {
+    ESP_LOGE(TAG, "Error occured during listen: errno %d", errno);
+  }
+  ESP_LOGI(TAG, "Socket listening");
+}
+
+void wifi_wait_for_socket_connected() {
+  ESP_LOGI(TAG, "Waiting for connection");
+  struct sockaddr sourceAddr;
+  uint addrLen = sizeof(sourceAddr);
+  conn = accept(sock, (struct sockaddr *)&sourceAddr, &addrLen);
+  if (conn < 0) {
+    ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+  }
+  ESP_LOGI(TAG, "Connection accepted");
+}
+
+void wifi_wait_for_disconnect() {
+  xEventGroupWaitBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED, pdTRUE, pdFALSE, portMAX_DELAY);
+}
+
+static void wifi_task(void *pvParameters) {
+  wifi_bind_socket();
+  while (1) {
+    //blink_period_ms = 500;
+    wifi_wait_for_socket_connected();
+    //blink_period_ms = 100;
+
+    // Not thread safe!
+    txp.src = MAKE_ROUTE(ESP32, WIFI_CTRL);
+    txp.dst = MAKE_ROUTE(GAP8, WIFI_CTRL);
+    txp.data[0] = 0x23; // WiFi client connection status
+    txp.data[1] = 1;
+    txp.length = 4;
+    com_send_blocking(&txp);
+
+    // Probably not the best, should be handled in some other way?
+    wifi_wait_for_disconnect();
+    ESP_LOGI(TAG, "Client disconnected");
+  }
+}
+
+void wifi_send_packet(const char * buffer, size_t size) {
+  if (conn != -1) {
+    ESP_LOGD(TAG, "Sending WiFi packet of size %u", size);
+    int err = send(conn, buffer, size, 0);
+    if (err < 0) {
+      ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+      conn = -1;
+      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+    }
+  } else {
+    ESP_LOGE(TAG, "No socket when trying to send data");
+    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+  }
+}
+
+/*void wifi_router_post_packet(esp_packet_t * packet) {
+  // Do we queue packet here instead?
+  wifi_send_packet(packet->data, packet->len);
+}*/
+
+static esp_routable_packet_t txp_wifi;
+static void wifi_sending_task(void *pvParameters) {
+  while (1) {
+    com_receive_wifi_data_blocking(&txp_wifi);
+    wifi_send_packet(&txp_wifi, txp_wifi.length + 2);
+  }
+}
+
+static esp_routable_packet_t rxp_wifi;
+static void wifi_receiving_task(void *pvParameters) {
+  int len;
+  while (1) {
+    // Lock on no client connected!
+    len = recv(conn, &rxp_wifi, 1, 0);
+    //ESP_LOGI(TAG, "Data len %i", len);
+    if (len > 0) {
+      ESP_LOGI(TAG, "Data len read %i", len);
+      len = recv(conn, &rxp_wifi.dst, rxp_wifi.length, 0);
+      ESP_LOGI(TAG, "Data len %i", len);
+      com_send_blocking(&rxp_wifi);  
+    } else {
+      vTaskDelay(10);
+    }
+  }
+}
+
+
 void wifi_init() {
+  tcpip_adapter_init();
+
+  s_wifi_event_group = xEventGroupCreate();
+
   xTaskCreate(wifi_ctrl, "WiFi CTRL", 10000, NULL, 1, NULL);
+
+  xTaskCreate(wifi_task, "WiFi TASk", 10000, NULL, 1, NULL);
+
+  xTaskCreate(wifi_sending_task, "WiFi TX", 10000, NULL, 1, NULL);
+
+  xTaskCreate(wifi_receiving_task, "WiFi RX", 10000, NULL, 1, NULL);  
+
 
   ESP_LOGI("WIFI", "Wifi initialized");
 }

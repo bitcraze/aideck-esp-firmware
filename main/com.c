@@ -10,6 +10,7 @@
 #include "freertos/event_groups.h"
 #include "esp_log.h"
 
+#include "routing_info.h"
 #include "router.h"
 
 
@@ -47,14 +48,14 @@ static void com_rx(void* _param) {
     xQueueReceive(espRxQueue, &rxp, (TickType_t) portMAX_DELAY);
     ESP_LOGD("COM", "Received packet for 0x%02X", rxp.dst);
     ESP_LOG_BUFFER_HEX_LEVEL("COM", &rxp, 10, ESP_LOG_DEBUG);
-    switch (rxp.dst) {
-      case AIDECK_ESP_TEST:
+    switch (ROUTE_FUNCTION(rxp.dst)) {
+      case TEST:
         xQueueSend(espTESTQueue, &rxp, (TickType_t) portMAX_DELAY);
         break;
-      case AIDECK_ESP_WIFI_CTRL:
+      case WIFI_CTRL:
         xQueueSend(espWiFiCTRLQueue, &rxp, (TickType_t) portMAX_DELAY);
         break;
-      case AIDECK_ESP_WIFI_DATA:
+      case WIFI_DATA:
         xQueueSend(espWiFiDataQueue, &rxp, (TickType_t) portMAX_DELAY);
         break;        
       default:
@@ -64,8 +65,6 @@ static void com_rx(void* _param) {
 }
 
 void com_init() {
-  xTaskCreate(com_rx, "COM RX", 10000, NULL, 1, NULL);
-
   espWiFiCTRLQueue = xQueueCreate(ESP_WIFI_CTRL_QUEUE_LENGTH, ESP_WIFI_CTRL_QUEUE_SIZE);
   espWiFiDataQueue = xQueueCreate(ESP_WIFI_DATA_QUEUE_LENGTH, ESP_WIFI_DATA_QUEUE_SIZE);
   espPMQueue = xQueueCreate(ESP_PM_QUEUE_LENGTH, ESP_PM_QUEUE_SIZE);
@@ -74,6 +73,8 @@ void com_init() {
 
   espRxQueue = xQueueCreate(ESP_ROUTER_RX_QUEUE_LENGTH, ESP_ROUTER_QUEUE_SIZE);
   espTxQueue = xQueueCreate(ESP_ROUTER_TX_QUEUE_LENGTH, ESP_ROUTER_QUEUE_SIZE);
+  
+  xTaskCreate(com_rx, "COM RX", 10000, NULL, 1, NULL);
 
   ESP_LOGI("COM", "Initialized");
 }
