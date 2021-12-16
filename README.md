@@ -7,6 +7,8 @@ well as implementing Wifi communication.
 **NOTE**: This firmware is still under heavy development and will probably change radically before
 it's ready for public use.
 
+**NOTE**: The default configuration now uses the NINA_SYSBOOT as log UART TX.
+
 ## Compile and flash
 
 The firmware is currently designed to be flashed and run from the serial port.
