@@ -202,6 +202,8 @@ static void wifi_task(void *pvParameters) {
   while (1) {
     //blink_period_ms = 500;
     wifi_wait_for_socket_connected();
+    ESP_LOGI(TAG, "Client connected");
+
     //blink_period_ms = 100;
 
     // Not thread safe!
@@ -209,7 +211,7 @@ static void wifi_task(void *pvParameters) {
     txp.route.destination = GAP8;
     txp.route.function = WIFI_CTRL;
     txp.data[0] = 0x32; // WiFi client connection status
-    txp.data[1] = 1;
+    txp.data[1] = 1;    // connected
     txp.length = 4;
     com_send_blocking(&txp);
 
@@ -219,6 +221,18 @@ static void wifi_task(void *pvParameters) {
     // Probably not the best, should be handled in some other way?
     wifi_wait_for_disconnect();
     ESP_LOGI(TAG, "Client disconnected");
+
+    // Not thread safe!
+    txp.route.source = ESP32;
+    txp.route.destination = GAP8;
+    txp.route.function = WIFI_CTRL;
+    txp.data[0] = 0x32; // WiFi client connection status
+    txp.data[1] = 0;    // disconnected
+    txp.length = 4;
+    com_send_blocking(&txp);
+
+    txp.route.destination = STM32;
+    com_send_blocking(&txp);
   }
 }
 
@@ -231,9 +245,6 @@ void wifi_send_packet(const char * buffer, size_t size) {
       conn = -1;
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
     }
-  } else {
-    ESP_LOGE(TAG, "No socket when trying to send data");
-    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
   }
 }
 
