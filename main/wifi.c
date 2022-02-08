@@ -304,13 +304,15 @@ static esp_routable_packet_t rxp_wifi;
 static void wifi_receiving_task(void *pvParameters) {
   int len;
   while (1) {
-    // Lock on no client connected!
     len = recv(conn, &rxp_wifi, 2, 0);
     if (len > 0) {
       ESP_LOGI(TAG, "Wire data length %i", rxp_wifi.length);
-      // How long will this read? 1024?!
-      len = recv(conn, &rxp_wifi.route, rxp_wifi.length, 0);
-      ESP_LOGI(TAG, "Read %i bytes", len);
+      int totalRxLen = 0;
+      do {
+        len = recv(conn, &(((uint8_t* ) &rxp_wifi.route)[totalRxLen]), rxp_wifi.length - totalRxLen, 0);
+        ESP_LOGI(TAG, "Read %i bytes", len);
+        totalRxLen += len;
+      } while (totalRxLen < rxp_wifi.length);
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
       xQueueSend(wifiRxQueue, &rxp_wifi, (TickType_t)portMAX_DELAY);
     } else {
