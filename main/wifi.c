@@ -64,11 +64,21 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
   switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
-      esp_wifi_connect();
+      ESP_ERROR_CHECK(esp_wifi_connect());
       break;
     case SYSTEM_EVENT_STA_GOT_IP:
       ESP_LOGI(TAG, "got ip:%s",
                 ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
+
+      wifi_ap_record_t ap_info;
+      ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
+      ESP_LOGD(TAG, "BSAP MAC is %x:%x:%x:%x:%x:%x", 
+          ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2], 
+          ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
+      ESP_LOGI(TAG, "country: %s", ap_info.country.cc);
+      ESP_LOGI(TAG, "rssi: %d", ap_info.rssi);
+      ESP_LOGI(TAG, "11b: %d, 11g: %d, 11n: %d, lr: %d",
+        ap_info.phy_11b, ap_info.phy_11g, ap_info.phy_11n, ap_info.phy_lr);
 
       txp.route.destination = GAP8;
       txp.route.source = ESP32;
@@ -88,7 +98,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
       xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
       break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-      esp_wifi_connect();
+      ESP_ERROR_CHECK(esp_wifi_connect());
       xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
       ESP_LOGI(TAG,"Disconnected from access point");
       break;
@@ -111,13 +121,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 /* Initialize WiFi as AP */
 static void wifi_init_softap(const char *ssid, const char* key)
 {
-  s_wifi_event_group = xEventGroupCreate();
-
-  // tcpip_adapter_init();
-  ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-
-  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-  ESP_ERROR_CHECK(esp_wifi_init(&cfg));
   wifi_config_t wifi_config = {
       .ap = {
           .ssid_len = strlen(ssid),
@@ -140,13 +143,6 @@ static void wifi_init_softap(const char *ssid, const char* key)
 
 static void wifi_init_sta(const char * ssid, const char * key)
 {
-  s_wifi_event_group = xEventGroupCreate();
-
-  //tcpip_adapter_init();
-  ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL) );
-
-  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-  ESP_ERROR_CHECK(esp_wifi_init(&cfg));
   wifi_config_t wifi_config;
   memset((void *)&wifi_config, 0, sizeof(wifi_config_t));
   strncpy((char *)wifi_config.sta.ssid, ssid, strlen(ssid));
@@ -242,6 +238,19 @@ void wifi_wait_for_disconnect() {
 }
 
 static void wifi_task(void *pvParameters) {
+
+  s_wifi_event_group = xEventGroupCreate();
+  ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+
+  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+  ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+  uint8_t mac[6];
+  ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_AP, mac));
+  ESP_LOGD(TAG, "AP MAC is %x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  ESP_ERROR_CHECK(esp_wifi_get_mac(ESP_IF_WIFI_STA, mac));
+  ESP_LOGD(TAG, "STA MAC is %x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
   wifi_bind_socket();
   while (1) {
     //blink_period_ms = 500;
