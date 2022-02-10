@@ -24,3 +24,13 @@ $ idf.py monitor
 ```
 
 [Esp32 IDF]: https://github.com/espressif/esp-idf.git
+
+### Build with the [toolbelt](https://github.com/bitcraze/toolbelt)
+
+When using the [toolbelt](https://github.com/bitcraze/toolbelt) the required toolchain is running in a docker container
+and no tools have to be installed on the machine.
+Just pre-pend make with tb, for instance
+
+`tb make`
+
+`tb make clean`
