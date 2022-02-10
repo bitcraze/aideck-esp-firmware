@@ -1,0 +1,7 @@
+{
+  "version": "2.0",
+  "environmentReqs": {
+    "build": ["python3"],
+    "build-docs": ["esp32"]
+  }
+}
