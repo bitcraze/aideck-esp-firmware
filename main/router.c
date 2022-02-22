@@ -30,7 +30,15 @@ static esp_packet_t esp_txp;
 
 static esp_packet_t esp_gap8_txp;
 
+static const int START_UP_GAP8_ROUTER_RUNNING = BIT0;
+static const int START_UP_CF_ROUTER_RUNNING = BIT1;
+static const int START_UP_ESP_ROUTER_RUNNING = BIT2;
+static const int START_UP_WIFI_ROUTER_RUNNING = BIT3;
+static EventGroupHandle_t startUpEventGroup;
+
+
 static void router_from_gap8(void* _param) {
+    xEventGroupSetBits(startUpEventGroup, START_UP_GAP8_ROUTER_RUNNING);
 
     while(1) {
       // Wait for incoming packet from GAP8
@@ -67,6 +75,7 @@ static void router_from_gap8(void* _param) {
 }
 
 static void router_from_crazyflie(void* _param) {
+    xEventGroupSetBits(startUpEventGroup, START_UP_CF_ROUTER_RUNNING);
 
     while(1) {
       uart_transport_receive(&cf_rxp);
@@ -96,6 +105,7 @@ static void router_from_crazyflie(void* _param) {
 }
 
 static void router_from_esp32(void* _param) {
+    xEventGroupSetBits(startUpEventGroup, START_UP_ESP_ROUTER_RUNNING);
 
     while(1) {
       com_router_get_packet(&esp_rxp);
@@ -125,6 +135,7 @@ static void router_from_esp32(void* _param) {
 }
 
 static void router_from_wifi(void* _param) {
+    xEventGroupSetBits(startUpEventGroup, START_UP_WIFI_ROUTER_RUNNING);
     // TODO: Fix this (wifi needs to be split, since it's being used from routing and using routing)
     vTaskDelay(100);
 
@@ -157,10 +168,21 @@ static void router_from_wifi(void* _param) {
 }
 
 void router_init() {
+  startUpEventGroup = xEventGroupCreate();
+  xEventGroupClearBits(startUpEventGroup, START_UP_GAP8_ROUTER_RUNNING | START_UP_CF_ROUTER_RUNNING | START_UP_ESP_ROUTER_RUNNING | START_UP_WIFI_ROUTER_RUNNING);
   xTaskCreate(router_from_gap8, "Router from GAP8", 10000, NULL, 1, NULL);
   xTaskCreate(router_from_crazyflie, "Router from CF", 10000, NULL, 1, NULL);
   xTaskCreate(router_from_esp32, "Router from ESP32", 10000, NULL, 1, NULL);
   xTaskCreate(router_from_wifi, "Router from WIFI", 10000, NULL, 1, NULL);
+  ESP_LOGI("ROUTER", "Waiting for tasks to start");
+  xEventGroupWaitBits(startUpEventGroup,
+                      START_UP_GAP8_ROUTER_RUNNING |
+                      START_UP_CF_ROUTER_RUNNING |
+                      START_UP_ESP_ROUTER_RUNNING |
+                      START_UP_WIFI_ROUTER_RUNNING,
+                      pdTRUE, // Clear bits before returning
+                      pdTRUE, // Wait for all bits
+                      portMAX_DELAY);
 
   ESP_LOGI("ROUTER", "Initialized");
 }

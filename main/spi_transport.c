@@ -37,9 +37,11 @@ static char * rx_buffer;
 static xQueueHandle tx_queue;
 static xQueueHandle rx_queue;
 
+#define TASK_EVENT (1<<0)
 static EventGroupHandle_t task_event;
 
-#define TASK_EVENT (1<<0)
+static const int START_UP_MAIN_TASK = BIT0;
+static EventGroupHandle_t startUpEventGroup;
 
 static TaskHandle_t spi_task_handle;
 
@@ -67,6 +69,7 @@ static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transa
 static void spi_task(void* _param) {
     static spi_transport_packet_t packet;
 
+    xEventGroupSetBits(startUpEventGroup, START_UP_MAIN_TASK);
     while(1) {
         if (uxQueueMessagesWaiting(tx_queue) == 0) {
             DEBUG("Waiting for events ...\n");
@@ -158,7 +161,7 @@ void spi_transport_init() {
         .miso_io_num = SPI_MISO_GPIO,
         .sclk_io_num = SPI_SCLK_GPIO,
     };
-    
+
     spi_slave_interface_config_t spi_slave_config = {
         .mode = 0,
         .spics_io_num = SPI_CS_GPIO,
@@ -175,7 +178,16 @@ void spi_transport_init() {
     rx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
 
     // Launching SPI communication task
+    startUpEventGroup = xEventGroupCreate();
+    xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK);
     xTaskCreate(spi_task, "SPI transport", 10000, NULL, 1, &spi_task_handle);
+    ESP_LOGI("SPI", "Waiting for task to start");
+    xEventGroupWaitBits(startUpEventGroup,
+                        START_UP_MAIN_TASK,
+                        pdTRUE, // Clear bits before returning
+                        pdTRUE, // Wait for all bits
+                        portMAX_DELAY);
+
     ESP_LOGI("SPI", "Transport initialized");
 }
 

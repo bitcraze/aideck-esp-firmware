@@ -37,8 +37,11 @@ static esp_routable_packet_t rxp;
 static xQueueHandle espRxQueue;
 static xQueueHandle espTxQueue;
 
-static void com_rx(void* _param) {
+static const int START_UP_RX_TASK = BIT0;
+static EventGroupHandle_t startUpEventGroup;
 
+static void com_rx(void* _param) {
+  xEventGroupSetBits(startUpEventGroup, START_UP_RX_TASK);
   while (1) {
     ESP_LOGD("COM", "Waiting for packet");
     xQueueReceive(espRxQueue, &rxp, (TickType_t) portMAX_DELAY);
@@ -50,7 +53,7 @@ static void com_rx(void* _param) {
         break;
       case WIFI_CTRL:
         xQueueSend(espWiFiCTRLQueue, &rxp, (TickType_t) portMAX_DELAY);
-        break; 
+        break;
       default:
         ESP_LOGW("COM", "Cannot handle 0x%02X", rxp.route.function);
     }
@@ -65,8 +68,15 @@ void com_init() {
 
   espRxQueue = xQueueCreate(ESP_ROUTER_RX_QUEUE_LENGTH, ESP_ROUTER_QUEUE_SIZE);
   espTxQueue = xQueueCreate(ESP_ROUTER_TX_QUEUE_LENGTH, ESP_ROUTER_QUEUE_SIZE);
-  
+
+  startUpEventGroup = xEventGroupCreate();
+  xEventGroupClearBits(startUpEventGroup, START_UP_RX_TASK);
   xTaskCreate(com_rx, "COM RX", 10000, NULL, 1, NULL);
+  xEventGroupWaitBits(startUpEventGroup,
+                      START_UP_RX_TASK,
+                      pdTRUE, // Clear bits before returning
+                      pdTRUE, // Wait for all bits
+                      portMAX_DELAY);
 
   ESP_LOGI("COM", "Initialized");
 }
@@ -90,4 +100,3 @@ void com_router_post_packet(esp_packet_t * packet) {
 void com_router_get_packet(esp_packet_t * packet) {
   xQueueReceive(espTxQueue, packet, (TickType_t) portMAX_DELAY);
 }
-

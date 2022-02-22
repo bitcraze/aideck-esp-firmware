@@ -31,9 +31,16 @@ static esp_routable_packet_t txp;
 static char ssid[MAX_SSID_SIZE];
 static char key[MAX_SSID_SIZE];
 
-const int WIFI_CONNECTED_BIT = BIT0;
-const int WIFI_SOCKET_DISCONNECTED = BIT1;
+static const int WIFI_CONNECTED_BIT = BIT0;
+static const int WIFI_SOCKET_DISCONNECTED = BIT1;
 static EventGroupHandle_t s_wifi_event_group;
+
+static const int START_UP_MAIN_TASK = BIT0;
+static const int START_UP_RX_TASK = BIT1;
+static const int START_UP_TX_TASK = BIT2;
+static const int START_UP_CTRL_TASK = BIT3;
+static EventGroupHandle_t startUpEventGroup;
+
 
 #define WIFI_HOST_QUEUE_LENGTH (2)
 #define WIFI_HOST_QUEUE_SIZE (sizeof(wifi_transport_packet_t))
@@ -72,8 +79,8 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 
       wifi_ap_record_t ap_info;
       ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
-      ESP_LOGD(TAG, "BSAP MAC is %x:%x:%x:%x:%x:%x", 
-          ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2], 
+      ESP_LOGD(TAG, "BSAP MAC is %x:%x:%x:%x:%x:%x",
+          ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
           ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
       ESP_LOGI(TAG, "country: %s", ap_info.country.cc);
       ESP_LOGI(TAG, "rssi: %d", ap_info.rssi);
@@ -162,6 +169,7 @@ static void wifi_ctrl(void* _param) {
   uint8_t length;
   uint8_t count;
 
+  xEventGroupSetBits(startUpEventGroup, START_UP_CTRL_TASK);
   while (1) {
     com_receive_wifi_ctrl_blocking((esp_routable_packet_t*) &rxp);
 
@@ -252,6 +260,8 @@ static void wifi_task(void *pvParameters) {
   ESP_LOGD(TAG, "STA MAC is %x:%x:%x:%x:%x:%x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
   wifi_bind_socket();
+
+  xEventGroupSetBits(startUpEventGroup, START_UP_MAIN_TASK);
   while (1) {
     //blink_period_ms = 500;
     wifi_wait_for_socket_connected();
@@ -303,6 +313,7 @@ void wifi_send_packet(const char * buffer, size_t size) {
 
 static wifi_transport_packet_t txp_wifi;
 static void wifi_sending_task(void *pvParameters) {
+  xEventGroupSetBits(startUpEventGroup, START_UP_TX_TASK);
   while (1) {
     xQueueReceive(wifiTxQueue, &txp_wifi, portMAX_DELAY);
     wifi_send_packet(&txp_wifi, txp_wifi.length + 2);
@@ -312,6 +323,8 @@ static void wifi_sending_task(void *pvParameters) {
 static esp_routable_packet_t rxp_wifi;
 static void wifi_receiving_task(void *pvParameters) {
   int len;
+
+  xEventGroupSetBits(startUpEventGroup, START_UP_RX_TASK);
   while (1) {
     len = recv(conn, &rxp_wifi, 2, 0);
     if (len > 0) {
@@ -346,14 +359,25 @@ void wifi_init() {
   wifiRxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
   wifiTxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
 
-  xTaskCreate(wifi_ctrl, "WiFi CTRL", 10000, NULL, 1, NULL);
-
-  xTaskCreate(wifi_task, "WiFi TASk", 10000, NULL, 1, NULL);
-
+  startUpEventGroup = xEventGroupCreate();
+  xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK | START_UP_CTRL_TASK);
+  xTaskCreate(wifi_task, "WiFi TASK", 10000, NULL, 1, NULL);
   xTaskCreate(wifi_sending_task, "WiFi TX", 10000, NULL, 1, NULL);
-
   xTaskCreate(wifi_receiving_task, "WiFi RX", 10000, NULL, 1, NULL);
+  ESP_LOGI(TAG, "Waiting for main, RX and TX tasks to start");
+  xEventGroupWaitBits(startUpEventGroup,
+                      START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK,
+                      pdTRUE, // Clear bits before returning
+                      pdTRUE, // Wait for all bits
+                      portMAX_DELAY);
 
+  xTaskCreate(wifi_ctrl, "WiFi CTRL", 10000, NULL, 1, NULL);
+  ESP_LOGI(TAG, "Waiting for CTRL task to start");
+  xEventGroupWaitBits(startUpEventGroup,
+                      START_UP_CTRL_TASK,
+                      pdTRUE, // Clear bits before returning
+                      pdTRUE, // Wait for all bits
+                      portMAX_DELAY);
 
   ESP_LOGI("WIFI", "Wifi initialized");
 }

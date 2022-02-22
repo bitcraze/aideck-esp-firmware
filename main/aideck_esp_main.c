@@ -76,7 +76,7 @@ void test_source() {
 
 void test_sink(int count) {
     static spi_transport_packet_t packet;
-    
+
     printf("Testing %d packet TX\n", count);
 
     int start  = xTaskGetTickCount();
@@ -198,8 +198,6 @@ void app_main(void)
 
     spi_transport_init();
 
-    vTaskDelay(50);
-
     const uart_config_t uart_config = {
       .baud_rate = 115200,
       .data_bits = UART_DATA_8_BITS,
@@ -216,16 +214,13 @@ void app_main(void)
     ESP_LOGI("SYS", "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
 
     uart_transport_init();
-
     com_init();
 
-    router_init();
-
-    //test_uart();
-
+    // TODO krri remove test
     test_init();
 
     wifi_init();
+    router_init();
 
     vTaskDelay(200);
 

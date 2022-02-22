@@ -31,6 +31,7 @@ static uart_transport_packet_t txp;
 static uart_transport_packet_t rxp;
 
 static EventGroupHandle_t evGroup;
+static EventGroupHandle_t startUpEventGroup;
 
 #define TXD_PIN (GPIO_NUM_1) // Nina 22 => 1
 #define RXD_PIN (GPIO_NUM_3) // Nina 23 => 3
@@ -39,22 +40,21 @@ static EventGroupHandle_t evGroup;
 #define CTR_EVENT (1<<1)
 #define TXQ_EVENT (1<<2)
 
+#define START_UP_RX_RUNNING (1<<0)
+#define START_UP_TX_RUNNING (1<<1)
+
 static void uart_tx_task(void* _param) {
   uint8_t ctr[] = {0xFF, 0x00};
   EventBits_t evBits = 0;
 
-     // We need to hold off here to make sure that the RX task
-    // has started up and is waiting for chars, otherwise we might send
-    // CTR and miss CTS (which means that the STM32 will stop sending CTS
-    // too early and we cannot sync)
-    vTaskDelay(100);
+  // Note: RX task must be running before we start the TX task
+  xEventGroupSetBits(startUpEventGroup, START_UP_TX_RUNNING);
 
-    do {
-      uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
-      vTaskDelay(10);
-      evBits = xEventGroupGetBits(evGroup);
-    } while ((evBits & CTS_EVENT) != CTS_EVENT);
-
+  do {
+    uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
+    vTaskDelay(10);
+    evBits = xEventGroupGetBits(evGroup);
+  } while ((evBits & CTS_EVENT) != CTS_EVENT);
 
   while(1) {
     // If we have nothing to send then wait, either for something to be
@@ -85,20 +85,20 @@ static void uart_tx_task(void* _param) {
         if ((evBits & CTR_EVENT) == CTR_EVENT) {
           ESP_LOGD("UART", "Sent CTR");
           uart_write_bytes(UART_NUM_0, &ctr, sizeof(ctr));
-        }       
+        }
       } while ((evBits & CTS_EVENT) != CTS_EVENT);
       ESP_LOGD("UART", "Sending packet");
       txp.start = 0xFF;
       uart_write_bytes(UART_NUM_0, &txp, txp.length+2);
-    }      
+    }
   }
 }
 
 
 static void uart_rx_task(void* _param) {
+    xEventGroupSetBits(startUpEventGroup, START_UP_RX_RUNNING);
 
     while(1) {
-        
         do {
           uart_read_bytes(UART_NUM_0, &rxp.start, 1, (TickType_t)portMAX_DELAY);
         } while (rxp.start != 0xFF);
@@ -149,9 +149,29 @@ void uart_transport_init() {
     /*tx_buffer = (char*)heap_caps_malloc(UART_BUFFER_LEN, MALLOC_CAP_DMA);
     rx_buffer = (char*)heap_caps_malloc(UART_BUFFER_LEN, MALLOC_CAP_DMA);*/
 
-    // Launching SPI communication task
-    xTaskCreate(uart_tx_task, "UART TX transport", 10000, NULL, 1, NULL);
+    // Launching communication tasks
+    startUpEventGroup = xEventGroupCreate();
+    xEventGroupClearBits(startUpEventGroup, START_UP_RX_RUNNING | START_UP_TX_RUNNING);
     xTaskCreate(uart_rx_task, "UART RX transport", 10000, NULL, 1, NULL);
+    ESP_LOGI("UART", "Waiting for RX task to start");
+    xEventGroupWaitBits(startUpEventGroup,
+                        START_UP_RX_RUNNING,
+                        pdTRUE, // Clear bits before returning
+                        pdTRUE, // Wait for all bits
+                        portMAX_DELAY);
+
+    // We need to hold off here to make sure that the RX task
+    // has started up and is waiting for chars before he TX task is started, otherwise we might send
+    // CTR and miss CTS (which means that the STM32 will stop sending CTS
+    // too early and we cannot sync)
+
+    xTaskCreate(uart_tx_task, "UART TX transport", 10000, NULL, 1, NULL);
+    ESP_LOGI("UART", "Waiting for TX task to start");
+    xEventGroupWaitBits(startUpEventGroup,
+                        START_UP_TX_RUNNING,
+                        pdTRUE, // Clear bits before returning
+                        pdTRUE, // Wait for all bits
+                        portMAX_DELAY);
 
     ESP_LOGI("UART", "Transport initialized");
 }
