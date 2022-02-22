@@ -10,7 +10,6 @@
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
-//#include "esp_event_loop.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -74,8 +73,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
       ESP_ERROR_CHECK(esp_wifi_connect());
       break;
     case SYSTEM_EVENT_STA_GOT_IP:
-      ESP_LOGI(TAG, "got ip:%s",
-                ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
+      ESP_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
 
       wifi_ap_record_t ap_info;
       ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
@@ -166,9 +164,6 @@ static void wifi_init_sta(const char * ssid, const char * key)
 }
 
 static void wifi_ctrl(void* _param) {
-  uint8_t length;
-  uint8_t count;
-
   xEventGroupSetBits(startUpEventGroup, START_UP_CTRL_TASK);
   while (1) {
     com_receive_wifi_ctrl_blocking((esp_routable_packet_t*) &rxp);
@@ -316,7 +311,7 @@ static void wifi_sending_task(void *pvParameters) {
   xEventGroupSetBits(startUpEventGroup, START_UP_TX_TASK);
   while (1) {
     xQueueReceive(wifiTxQueue, &txp_wifi, portMAX_DELAY);
-    wifi_send_packet(&txp_wifi, txp_wifi.length + 2);
+    wifi_send_packet((const char *)&txp_wifi, txp_wifi.length + 2);
   }
 }
 

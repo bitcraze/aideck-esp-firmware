@@ -73,8 +73,7 @@ static void spi_task(void* _param) {
     while(1) {
         if (uxQueueMessagesWaiting(tx_queue) == 0) {
             DEBUG("Waiting for events ...\n");
-            int bits = xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
-            // xEventGroupClearBits(task_event, TASK_EVENT);
+            xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
             DEBUG("Event! %02x\n", bits);
         }
 
