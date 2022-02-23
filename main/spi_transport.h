@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include "cpx.h"
 
+// The SPI transport module represents the transport link between the router and the GAP8 module on the AI-deck.
 
 #define SPI_TRANSPORT_MTU 1022
 
@@ -18,6 +19,6 @@ typedef struct {
 
 void spi_transport_init();
 
+// Interface used by the router
 void spi_transport_send(const uint8_t* data, const uint16_t dataLen);
-
 uint16_t spi_transport_receive(uint8_t* data);

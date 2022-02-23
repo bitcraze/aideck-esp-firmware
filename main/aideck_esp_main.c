@@ -18,6 +18,7 @@
 #include "esp_log.h"
 #include "esp_event.h"
 
+#include "esp_transport.h"
 #include "spi_transport.h"
 #include "uart_transport.h"
 #include "router.h"
@@ -34,7 +35,7 @@
 
 //     printf("Testing %d max-size pings ...\n", count);
 
-//     packet.length = ESP_PACKET_SIZE;
+//     packet.length = ESP_TRANSPORT_MTU;
 //     packet.data[0] = 0x01;
 //     spi_transport_send(&packet);
 
@@ -80,7 +81,7 @@
 
 //     int start  = xTaskGetTickCount();
 //     for (int i=0; i<count; i++) {
-//         packet.length = ESP_PACKET_SIZE;
+//         packet.length = ESP_TRANSPORT_MTU;
 //         packet.data[0] = 0x00;
 //         spi_transport_send(&packet);
 //     }
@@ -88,7 +89,7 @@
 
 //     float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
 //     float pk_per_seconds = count / runtime;
-//     printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * ESP_PACKET_SIZE);
+//     printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * ESP_TRANSPORT_MTU);
 // }
 
 int my_vprintf(const char * fmt, va_list ap) {
@@ -144,6 +145,7 @@ void app_main(void)
     ESP_LOGI("SYS", "\n\n -- Starting up --\n");
     ESP_LOGI("SYS", "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
 
+    espTransportInit();
     uart_transport_init();
     com_init();
 

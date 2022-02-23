@@ -13,7 +13,7 @@
 #include "cpx.h"
 #include "spi_transport.h"
 #include "uart_transport.h"
-#include "com.h"
+#include "esp_transport.h"
 #include "wifi.h"
 
 typedef struct {
@@ -24,13 +24,13 @@ static RouteContext_t wifi_task_context;
 static uint8_t wifiRxBuf[WIFI_TRANSPORT_MTU];
 
 static RouteContext_t gap8_task_context;
-static uint8_t spiRxBuf[ESP_PACKET_SIZE];
+static uint8_t spiRxBuf[SPI_TRANSPORT_MTU];
 
 static RouteContext_t cf_task_context;
 static uint8_t uartRxBuf[UART_TRANSPORT_MTU];
 
 static RouteContext_t esp_task_context;
-static uint8_t espRxBuf[ESP_PACKET_SIZE];
+static uint8_t espRxBuf[ESP_TRANSPORT_MTU];
 
 typedef uint16_t (*Receiver_t)(uint8_t* data);
 typedef void (*Sender_t)(const uint8_t* data, const uint16_t dataLength);
@@ -68,7 +68,7 @@ static void route(Receiver_t receive, uint8_t* rxBuf, RouteContext_t* context) {
         break;
       case ESP32:
         ESP_LOGD("ROUTER", "[0x%02X] -> ESP32 [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
-        splitAndSend(rxp, rxBufLength, context, com_router_post_packet);
+        splitAndSend(rxp, rxBufLength, context, espTransportSend);
         break;
       case HOST:
         ESP_LOGD("ROUTER", "[0x%02X] -> HOST [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
@@ -92,7 +92,7 @@ static void router_from_crazyflie(void* _param) {
 
 static void router_from_esp32(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_ESP_ROUTER_RUNNING);
-  route(com_router_get_packet, espRxBuf, &esp_task_context);
+  route(espTransportReceive, espRxBuf, &esp_task_context);
 }
 
 static void router_from_wifi(void* _param) {

@@ -97,10 +97,10 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
       ESP_LOGI(TAG, "0x%04X", (uint32_t) event->event_info.got_ip.ip_info.ip.addr);
 
       // TODO: We should probably not block here...
-      com_send_blocking(&txp);
+      espAppSendToRouterBlocking(&txp);
 
       txp.route.destination = STM32;
-      com_send_blocking(&txp);
+      espAppSendToRouterBlocking(&txp);
 
       xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
       break;
@@ -275,10 +275,10 @@ static void wifi_task(void *pvParameters) {
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 1;    // connected
     txp.length = 4;
-    com_send_blocking(&txp);
+    espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = STM32;
-    com_send_blocking(&txp);
+    espAppSendToRouterBlocking(&txp);
 
     // Probably not the best, should be handled in some other way?
     wifi_wait_for_disconnect();
@@ -291,10 +291,10 @@ static void wifi_task(void *pvParameters) {
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 0;    // disconnected
     txp.length = 4;
-    com_send_blocking(&txp);
+    espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = STM32;
-    com_send_blocking(&txp);
+    espAppSendToRouterBlocking(&txp);
   }
 }
 

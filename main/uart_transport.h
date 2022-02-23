@@ -1,5 +1,7 @@
 #pragma once
 
+// The UART transport module represents the transport link between the router and the STM on the Crazyflie.
+
 #include <stdint.h>
 #include <stddef.h>
 #include "cpx.h"
@@ -19,6 +21,6 @@ typedef struct {
 
 void uart_transport_init();
 
+// Interface used by the router
 void uart_transport_send(const uint8_t* data, const uint16_t dataLen);
-
 uint16_t uart_transport_receive(uint8_t* data);

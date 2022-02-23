@@ -20,7 +20,7 @@ static esp_routable_packet_t txp;
 #ifdef RUN_TESTS_FROM_ESP32
 static void test_runner(void* _param) {
   while (1) {
-    
+
 }
 #endif
 
@@ -49,7 +49,7 @@ static void test_rx(void* _param) {
         txp.route.source = rxp.route.destination;
         txp.route.destination = rxp.route.source;
         //printf("Will send packet of length %u\n", txp.length);
-        com_send_blocking((esp_routable_packet_t*) &txp);
+        espAppSendToRouterBlocking((esp_routable_packet_t*) &txp);
         break;
       case 2:
         // Source
@@ -65,19 +65,19 @@ static void test_rx(void* _param) {
           for (int j = 0; j < length; j++) {
             txp.data[j] = j;
           }
-          com_send_blocking((esp_routable_packet_t*) &txp);
+          espAppSendToRouterBlocking((esp_routable_packet_t*) &txp);
         }
         break;
       default:
          ESP_LOGW("TEST", "UNKNOWN");
     }
-  }    
+  }
 }
 
 void test_init() {
   xTaskCreate(test_rx, "TEST RX", 10000, NULL, 1, NULL);
 
-#ifdef RUN_TESTS_FROM_ESP32  
+#ifdef RUN_TESTS_FROM_ESP32
   xTaskCreate(test_runner, "TEST runner", 10000, NULL, 1, NULL);
   ESP_LOGI("TEST", "Test runner initialized, will run tests");
 #endif

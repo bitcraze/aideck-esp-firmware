@@ -2,11 +2,12 @@
 
 #include <stdint.h>
 
+// This enum is used to identify source and destination for messages
 typedef enum {
-  STM32 = 1,
-  ESP32 = 2,
-  HOST = 3,
-  GAP8 = 4
+  STM32 = 1, // The STM in the Crazyflie
+  ESP32 = 2, // The ESP on the AI-deck
+  HOST = 3,  // A remote computer connected via Wifi
+  GAP8 = 4   // The GAP8 on the AI-deck
 } __attribute__((packed)) CPXTarget_t;
 
 typedef enum {
