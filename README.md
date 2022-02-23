@@ -1,4 +1,4 @@
-# AI-Deck ESP32 firmware
+# AI-Deck ESP32 firmware [![CI](https://github.com/bitcraze/aideck-esp-firmware/workflows/CI/badge.svg)](https://github.com/bitcraze/aideck-esp-firmware/actions?query=workflow%3ACI)
 
 This firmware is running on the ESP32 Nina W102 module of the AI-Deck. It
 implements communication with the GAP8 chip, the Crazyflie's STM32 main MCU as
