@@ -43,6 +43,10 @@ static EventGroupHandle_t startUpEventGroup;
 #define START_UP_RX_RUNNING (1<<0)
 #define START_UP_TX_RUNNING (1<<1)
 
+static xSemaphoreHandle transportSendLock;
+static StaticSemaphore_t transportSendLockBuffer;
+
+
 static void uart_tx_task(void* _param) {
   uint8_t ctr[] = {0xFF, 0x00};
   EventBits_t evBits = 0;
@@ -145,9 +149,8 @@ void uart_transport_init() {
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    // Allocating buffers
-    /*tx_buffer = (char*)heap_caps_malloc(UART_BUFFER_LEN, MALLOC_CAP_DMA);
-    rx_buffer = (char*)heap_caps_malloc(UART_BUFFER_LEN, MALLOC_CAP_DMA);*/
+    transportSendLock = xSemaphoreCreateMutexStatic(&transportSendLockBuffer);
+    configASSERT(transportSendLock);
 
     // Launching communication tasks
     startUpEventGroup = xEventGroupCreate();
@@ -176,11 +179,26 @@ void uart_transport_init() {
     ESP_LOGI("UART", "Transport initialized");
 }
 
-void uart_transport_send(const uart_transport_packet_t *packet) {
-    xQueueSend(tx_queue, packet, portMAX_DELAY);
-    xEventGroupSetBits(evGroup, TXQ_EVENT);
+void uart_transport_send(const uint8_t* data, const uint16_t dataLen) {
+  static uart_transport_packet_t txBuffer;
+
+  assert(dataLen <= UART_TRANSPORT_MTU);
+
+  xSemaphoreTake(transportSendLock, portMAX_DELAY);
+  txBuffer.length = dataLen;
+  memcpy(txBuffer.data, data, dataLen);
+
+  xQueueSend(tx_queue, &txBuffer, portMAX_DELAY);
+  xSemaphoreGive(transportSendLock);
+
+  xEventGroupSetBits(evGroup, TXQ_EVENT);
 }
 
-void uart_transport_receive(uart_transport_packet_t *packet) {
-    xQueueReceive(rx_queue, packet, portMAX_DELAY);
+uint16_t uart_transport_receive(uint8_t* data) {
+  static uart_transport_packet_t rxBuffer;
+
+  xQueueReceive(rx_queue, &rxBuffer, portMAX_DELAY);
+  memcpy(data, rxBuffer.data, rxBuffer.length);
+
+  return rxBuffer.length;
 }

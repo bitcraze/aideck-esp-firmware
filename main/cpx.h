@@ -25,8 +25,13 @@ typedef struct {
   uint8_t function;
 } __attribute__((packed)) CPXRouting_t;
 
-/*typedef struct {
-    CPXRouting_t routing;
-    uint8_t data[MTU];
-} __attribute__((packed)) CPXPacket_t;*/
+#define CPX_ROUTING_INFO_SIZE (sizeof(CPXRouting_t))
 
+// The maximum MTU of any link
+#define CPX_MAX_PAYLOAD_SIZE 1022
+
+
+typedef struct {
+    CPXRouting_t route;
+    uint8_t data[CPX_MAX_PAYLOAD_SIZE - CPX_ROUTING_INFO_SIZE];
+} __attribute__((packed)) CPXRoutablePacket_t;

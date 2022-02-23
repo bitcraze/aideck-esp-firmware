@@ -28,67 +28,68 @@
 /* The LED is connected on GPIO */
 #define BLINK_GPIO 4
 
-void test_echo(int count) {
-    static spi_transport_packet_t packet;
+// TODO krri remove?
+// void test_echo(int count) {
+//     static spi_transport_packet_t packet;
 
-    printf("Testing %d max-size pings ...\n", count);
+//     printf("Testing %d max-size pings ...\n", count);
 
-    packet.length = SPI_TRANSPORT_MTU;
-    packet.data[0] = 0x01;
-    spi_transport_send(&packet);
+//     packet.length = ESP_PACKET_SIZE;
+//     packet.data[0] = 0x01;
+//     spi_transport_send(&packet);
 
-    int start  = xTaskGetTickCount();
-    for (int i=0; i<100; i++) {
-        packet.length = 64;
-        packet.data[0] = 0x01;
-        spi_transport_send(&packet);
-        spi_transport_receive(&packet);
-    }
+//     int start  = xTaskGetTickCount();
+//     for (int i=0; i<100; i++) {
+//         packet.length = 64;
+//         packet.data[0] = 0x01;
+//         spi_transport_send(&packet);
+//         spi_transport_receive(&packet);
+//     }
 
-    spi_transport_receive(&packet);
+//     spi_transport_receive(&packet);
 
-    int stop = xTaskGetTickCount();
+//     int stop = xTaskGetTickCount();
 
-    float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
-    float ping_per_seconds = count / runtime;
-    printf("Done in %f ms, %f ping/s\n", runtime * 1000, ping_per_seconds);
-}
+//     float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
+//     float ping_per_seconds = count / runtime;
+//     printf("Done in %f ms, %f ping/s\n", runtime * 1000, ping_per_seconds);
+// }
 
-void test_source() {
-    static spi_transport_packet_t packet;
+// void test_source() {
+//     static spi_transport_packet_t packet;
 
-    printf("Testing sourcing 100 packets ...\n");
+//     printf("Testing sourcing 100 packets ...\n");
 
-    packet.length = 10;
-    packet.data[0] = 0x02;
-    packet.data[1] = 100;
-    packet.data[2] = 62;
+//     packet.length = 10;
+//     packet.data[0] = 0x02;
+//     packet.data[1] = 100;
+//     packet.data[2] = 62;
 
-    spi_transport_send(&packet);
+//     spi_transport_send(&packet);
 
-    for (int i=0; i<100; i++) {
-        spi_transport_receive(&packet);
-    }
-    printf("Done!\n");
-}
+//     for (int i=0; i<100; i++) {
+//         spi_transport_receive(&packet);
+//     }
+//     printf("Done!\n");
+// }
 
-void test_sink(int count) {
-    static spi_transport_packet_t packet;
+// void test_sink(int count) {
+//     static spi_transport_packet_t packet;
 
-    printf("Testing %d packet TX\n", count);
+//     printf("Testing %d packet TX\n", count);
 
-    int start  = xTaskGetTickCount();
-    for (int i=0; i<count; i++) {
-        packet.length = SPI_TRANSPORT_MTU;
-        packet.data[0] = 0x00;
-        spi_transport_send(&packet);
-    }
-    int stop = xTaskGetTickCount();
+//     int start  = xTaskGetTickCount();
+//     for (int i=0; i<count; i++) {
+//         packet.length = ESP_PACKET_SIZE;
+//         packet.data[0] = 0x00;
+//         spi_transport_send(&packet);
+//     }
+//     int stop = xTaskGetTickCount();
 
-    float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
-    float pk_per_seconds = count / runtime;
-    printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * SPI_TRANSPORT_MTU);
-}
+//     float runtime = (float)(stop - start) / (float)xPortGetTickRateHz();
+//     float pk_per_seconds = count / runtime;
+//     printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * ESP_PACKET_SIZE);
+// }
 
 int my_vprintf(const char * fmt, va_list ap) {
     int len = vprintf("Hello: ", ap);

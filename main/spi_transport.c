@@ -45,6 +45,10 @@ static EventGroupHandle_t startUpEventGroup;
 
 static TaskHandle_t spi_task_handle;
 
+static xSemaphoreHandle transportSendLock;
+static StaticSemaphore_t transportSendLockBuffer;
+
+
 void IRAM_ATTR gap_rtt_enabled_handler(void * _param) {
     int task_woken = 0;
 
@@ -176,6 +180,9 @@ void spi_transport_init() {
     tx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
     rx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
 
+    transportSendLock = xSemaphoreCreateMutexStatic(&transportSendLockBuffer);
+    configASSERT(transportSendLock);
+
     // Launching SPI communication task
     startUpEventGroup = xEventGroupCreate();
     xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK);
@@ -190,11 +197,27 @@ void spi_transport_init() {
     ESP_LOGI("SPI", "Transport initialized");
 }
 
-void spi_transport_send(const spi_transport_packet_t *packet) {
-    xQueueSend(tx_queue, packet, portMAX_DELAY);
+
+void spi_transport_send(const uint8_t* data, const uint16_t dataLen) {
+    static spi_transport_packet_t txBuffer;
+
+    assert(dataLen <= SPI_TRANSPORT_MTU);
+
+    xSemaphoreTake(transportSendLock, portMAX_DELAY);
+    txBuffer.length = dataLen;
+    memcpy(txBuffer.data, data, dataLen);
+
+    xQueueSend(tx_queue, &txBuffer, portMAX_DELAY);
+    xSemaphoreGive(transportSendLock);
+
     xEventGroupSetBits(task_event, TASK_EVENT);
 }
 
-void spi_transport_receive(spi_transport_packet_t *packet) {
-    xQueueReceive(rx_queue, packet, portMAX_DELAY);
+uint16_t spi_transport_receive(uint8_t* data) {
+    static spi_transport_packet_t rxBuffer;
+
+    xQueueReceive(rx_queue, &rxBuffer, portMAX_DELAY);
+    memcpy(data, rxBuffer.data, rxBuffer.length);
+
+    return rxBuffer.length;
 }

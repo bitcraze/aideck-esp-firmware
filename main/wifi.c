@@ -40,6 +40,8 @@ static const int START_UP_TX_TASK = BIT2;
 static const int START_UP_CTRL_TASK = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
+static xSemaphoreHandle transportSendLock;
+static StaticSemaphore_t transportSendLockBuffer;
 
 #define WIFI_HOST_QUEUE_LENGTH (2)
 #define WIFI_HOST_QUEUE_SIZE (sizeof(wifi_transport_packet_t))
@@ -162,6 +164,8 @@ static void wifi_init_sta(const char * ssid, const char * key)
 
   ESP_LOGI(TAG, "wifi_init_sta finished.");
 }
+
+// TODO krri Break up transport from functionality
 
 static void wifi_ctrl(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_CTRL_TASK);
@@ -338,12 +342,26 @@ static void wifi_receiving_task(void *pvParameters) {
   }
 }
 
-void wifi_transport_send(const wifi_transport_packet_t *packet) {
-  xQueueSend(wifiTxQueue, packet, portMAX_DELAY);
+void wifi_transport_send(const uint8_t* data, const uint16_t dataLen) {
+  static wifi_transport_packet_t txBuffer;
+
+  assert(dataLen <= WIFI_TRANSPORT_MTU);
+
+  xSemaphoreTake(transportSendLock, portMAX_DELAY);
+  txBuffer.length = dataLen;
+  memcpy(txBuffer.data, data, dataLen);
+
+  xQueueSend(wifiTxQueue, &txBuffer, portMAX_DELAY);
+  xSemaphoreGive(transportSendLock);
 }
 
-void wifi_transport_receive(wifi_transport_packet_t *packet) {
-  xQueueReceive(wifiRxQueue, packet, portMAX_DELAY);
+uint16_t wifi_transport_receive(uint8_t* data) {
+  static wifi_transport_packet_t rxBuffer;
+
+  xQueueReceive(wifiRxQueue, &rxBuffer, portMAX_DELAY);
+  memcpy(data, rxBuffer.data, rxBuffer.length);
+
+  return rxBuffer.length;
 }
 
 void wifi_init() {
@@ -353,6 +371,9 @@ void wifi_init() {
 
   wifiRxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
   wifiTxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
+
+  transportSendLock = xSemaphoreCreateMutexStatic(&transportSendLockBuffer);
+  configASSERT(transportSendLock);
 
   startUpEventGroup = xEventGroupCreate();
   xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK | START_UP_CTRL_TASK);
