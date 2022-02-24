@@ -28,11 +28,11 @@
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
 
-//#define DEBUG(...) ESP_LOGI("SPI", __VA_ARGS__)
+// #define DEBUG(...) ESP_LOGI("SPI", __VA_ARGS__)
 #define DEBUG(...)
 
-static char * tx_buffer;
-static char * rx_buffer;
+static uint8_t * tx_buffer;
+static uint8_t * rx_buffer;
 
 static xQueueHandle tx_queue;
 static xQueueHandle rx_queue;
@@ -44,9 +44,6 @@ static const int START_UP_MAIN_TASK = BIT0;
 static EventGroupHandle_t startUpEventGroup;
 
 static TaskHandle_t spi_task_handle;
-
-static xSemaphoreHandle transportSendLock;
-static StaticSemaphore_t transportSendLockBuffer;
 
 
 void IRAM_ATTR gap_rtt_enabled_handler(void * _param) {
@@ -71,23 +68,30 @@ static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transa
 }
 
 static void spi_task(void* _param) {
-    static spi_transport_packet_t packet;
+    static CPXRoutablePacket_t qPacket;
 
     xEventGroupSetBits(startUpEventGroup, START_UP_MAIN_TASK);
     while(1) {
         if (uxQueueMessagesWaiting(tx_queue) == 0) {
             DEBUG("Waiting for events ...\n");
             xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
-            DEBUG("Event! %02x\n", bits);
         }
 
         // Check if we can send a packet
-        if (xQueueReceive(tx_queue, &packet, 0) == pdTRUE) {
+        if (xQueueReceive(tx_queue, &qPacket, 0) == pdTRUE) {
             DEBUG("Some data to send ...\n");
             // Set the length byte and copy the packet to the TX buffer
-            tx_buffer[0] = packet.length;
-            tx_buffer[1] = packet.length >> 8;
-            memcpy(&tx_buffer[2], packet.data, packet.length);
+            const uint16_t payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
+            tx_buffer[0] = payloadLength;
+            tx_buffer[1] = payloadLength >> 8;
+
+            CPXRoutingPacked_t routing;
+            routing.source = qPacket.route.source;
+            routing.destination = qPacket.route.destination;
+            routing.function = qPacket.route.function;
+            memcpy(&tx_buffer[2], &routing, CPX_ROUTING_PACKED_SIZE);
+
+            memcpy(&tx_buffer[2 + CPX_ROUTING_PACKED_SIZE], qPacket.data, qPacket.dataLength);
         } else {
             // Nothing to send, length byte=0
             tx_buffer[0] = 0;
@@ -117,9 +121,16 @@ static void spi_task(void* _param) {
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_len != 0) {
-            packet.length = rx_len;
-            memcpy(packet.data, &rx_buffer[2], packet.length);
-            xQueueSend(rx_queue, &packet, portMAX_DELAY);
+            qPacket.dataLength = rx_len - CPX_ROUTING_PACKED_SIZE;
+
+            CPXRoutingPacked_t routing;
+            memcpy(&routing, &rx_buffer[2], CPX_ROUTING_PACKED_SIZE);
+            qPacket.route.source = routing.source;
+            qPacket.route.destination = routing.destination;
+            qPacket.route.function = routing.function;
+
+            memcpy(qPacket.data, &rx_buffer[2 + CPX_ROUTING_PACKED_SIZE], qPacket.dataLength);
+            xQueueSend(rx_queue, &qPacket, portMAX_DELAY);
         }
     }
 }
@@ -127,8 +138,8 @@ static void spi_task(void* _param) {
 void spi_transport_init() {
 
     // Setting up synchronization items
-    tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof(spi_transport_packet_t));
-    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(spi_transport_packet_t));
+    tx_queue = xQueueCreate(TX_QUEUE_LENGTH, sizeof(CPXRoutablePacket_t));
+    rx_queue = xQueueCreate(RX_QUEUE_LENGTH, sizeof(CPXRoutablePacket_t));
 
     task_event = xEventGroupCreate();
 
@@ -177,11 +188,9 @@ void spi_transport_init() {
     spi_slave_initialize(VSPI_HOST, &spi_config, &spi_slave_config, 1);
 
     // Allocating buffers
-    tx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
-    rx_buffer = (char*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
-
-    transportSendLock = xSemaphoreCreateMutexStatic(&transportSendLockBuffer);
-    configASSERT(transportSendLock);
+    // TODO krri Malloc?
+    tx_buffer = heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
+    rx_buffer = heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
 
     // Launching SPI communication task
     startUpEventGroup = xEventGroupCreate();
@@ -198,26 +207,11 @@ void spi_transport_init() {
 }
 
 
-void spi_transport_send(const uint8_t* data, const uint16_t dataLen) {
-    static spi_transport_packet_t txBuffer;
-
-    assert(dataLen <= SPI_TRANSPORT_MTU);
-
-    xSemaphoreTake(transportSendLock, portMAX_DELAY);
-    txBuffer.length = dataLen;
-    memcpy(txBuffer.data, data, dataLen);
-
-    xQueueSend(tx_queue, &txBuffer, portMAX_DELAY);
-    xSemaphoreGive(transportSendLock);
-
-    xEventGroupSetBits(task_event, TASK_EVENT);
+void spi_transport_send(const CPXRoutablePacket_t* packet) {
+    assert(packet->dataLength <= SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+    xQueueSend(tx_queue, packet, portMAX_DELAY);
 }
 
-uint16_t spi_transport_receive(uint8_t* data) {
-    static spi_transport_packet_t rxBuffer;
-
-    xQueueReceive(rx_queue, &rxBuffer, portMAX_DELAY);
-    memcpy(data, rxBuffer.data, rxBuffer.length);
-
-    return rxBuffer.length;
+void spi_transport_receive(CPXRoutablePacket_t* packet) {
+    xQueueReceive(rx_queue, packet, portMAX_DELAY);
 }

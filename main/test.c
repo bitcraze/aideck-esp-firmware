@@ -29,7 +29,7 @@ static void test_rx(void* _param) {
   uint8_t count;
 
   while (1) {
-    com_receive_test_blocking((esp_routable_packet_t*) &rxp);
+    com_receive_test_blocking(&rxp);
     switch(rxp.route.source) {
       case 0x0: ESP_LOGD("TEST", "Request from STM32"); break;
       case 0x2: ESP_LOGD("TEST", "Request from GAP8"); break;
@@ -45,7 +45,7 @@ static void test_rx(void* _param) {
         // echo
         ESP_LOGD("TEST", "ECHO");
         //printf("Got packet of length %u\n", rxp.length);
-        memcpy(&txp, &rxp, rxp.length + 4);
+        memcpy(&txp, &rxp, rxp.dataLength + 4);
         txp.route.source = rxp.route.destination;
         txp.route.destination = rxp.route.source;
         //printf("Will send packet of length %u\n", txp.length);
@@ -55,7 +55,7 @@ static void test_rx(void* _param) {
         // Source
         length = rxp.data[2];
         count = rxp.data[1];
-        txp.length = length;
+        txp.dataLength = length;
         txp.route.source = rxp.route.destination;
         txp.route.destination = rxp.route.source;
 

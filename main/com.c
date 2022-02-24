@@ -72,9 +72,9 @@ void com_init() {
 }
 
 void com_receive_test_blocking(esp_routable_packet_t * packet) {
-  xQueueReceive(espTESTQueue, packet, (TickType_t) portMAX_DELAY);
+  xQueueReceive(espTESTQueue, packet, portMAX_DELAY);
 }
 
 void com_receive_wifi_ctrl_blocking(esp_routable_packet_t * packet) {
-  xQueueReceive(espWiFiCTRLQueue, packet, (TickType_t) portMAX_DELAY);
+  xQueueReceive(espWiFiCTRLQueue, packet, portMAX_DELAY);
 }

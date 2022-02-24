@@ -13,12 +13,12 @@
 #endif
 
 typedef struct {
-    size_t length;
+    uint16_t length;
     uint8_t data[SPI_TRANSPORT_MTU];
 } __attribute__((packed)) spi_transport_packet_t;
 
 void spi_transport_init();
 
 // Interface used by the router
-void spi_transport_send(const uint8_t* data, const uint16_t dataLen);
-uint16_t spi_transport_receive(uint8_t* data);
+void spi_transport_send(const CPXRoutablePacket_t* packet);
+void spi_transport_receive(CPXRoutablePacket_t* packet);

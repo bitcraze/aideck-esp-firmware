@@ -15,17 +15,8 @@
     #pragma warn "ESP MTU bigger than defined by CPX"
 #endif
 
-typedef struct {
-    uint16_t length;
-    uint8_t data[ESP_TRANSPORT_MTU];
-} __attribute__((packed)) esp_packet_t;
-
-typedef struct {
-    uint16_t length;
-    CPXRouting_t route;
-    uint8_t data[ESP_TRANSPORT_MTU - CPX_ROUTING_INFO_SIZE];
-} __attribute__((packed)) esp_routable_packet_t;
-
+// esp_routable_packet_t is identical to CPXRoutablePacket_t
+typedef CPXRoutablePacket_t esp_routable_packet_t;
 
 void espTransportInit();
 
@@ -36,5 +27,5 @@ void espAppReceiveFromRouter(esp_routable_packet_t* packet);
 
 
 // Interface used by the router
-void espTransportSend(const uint8_t* data, const uint16_t dataLen);
-uint16_t espTransportReceive(uint8_t* data);
+void espTransportSend(const CPXRoutablePacket_t* packet);
+void espTransportReceive(CPXRoutablePacket_t* packet);

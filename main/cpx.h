@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-// This enum is used to identify source and destination for messages
+// This enum is used to identify source and destination for CPX routing information
 typedef enum {
   STM32 = 1, // The STM in the Crazyflie
   ESP32 = 2, // The ESP on the AI-deck
@@ -21,18 +21,29 @@ typedef enum {
 } __attribute__((packed)) CPXFunction_t;
 
 typedef struct {
+  uint8_t destination;
+  uint8_t source;
+  uint8_t function;
+} CPXRouting_t;
+
+// This struct contains routing information in a packed format. This struct
+// should mainly be used to serialize data when tranfering. Unpacked formats
+// should be preferred in application code.
+typedef struct {
   uint8_t destination : 4;
   uint8_t source : 4;
   uint8_t function;
-} __attribute__((packed)) CPXRouting_t;
+} __attribute__((packed)) CPXRoutingPacked_t;
 
-#define CPX_ROUTING_INFO_SIZE (sizeof(CPXRouting_t))
+#define CPX_ROUTING_PACKED_SIZE (sizeof(CPXRoutingPacked_t))
 
 // The maximum MTU of any link
 #define CPX_MAX_PAYLOAD_SIZE 1022
 
 
 typedef struct {
-    CPXRouting_t route;
-    uint8_t data[CPX_MAX_PAYLOAD_SIZE - CPX_ROUTING_INFO_SIZE];
-} __attribute__((packed)) CPXRoutablePacket_t;
+  CPXRouting_t route;
+
+  uint16_t dataLength;
+  uint8_t data[CPX_MAX_PAYLOAD_SIZE - CPX_ROUTING_PACKED_SIZE];
+} CPXRoutablePacket_t;

@@ -40,11 +40,7 @@ static const int START_UP_TX_TASK = BIT2;
 static const int START_UP_CTRL_TASK = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
-static xSemaphoreHandle transportSendLock;
-static StaticSemaphore_t transportSendLockBuffer;
-
 #define WIFI_HOST_QUEUE_LENGTH (2)
-#define WIFI_HOST_QUEUE_SIZE (sizeof(wifi_transport_packet_t))
 
 static xQueueHandle wifiRxQueue;
 static xQueueHandle wifiTxQueue;
@@ -92,7 +88,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
       txp.route.function = WIFI_CTRL;
       txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
       memcpy(&txp.data[1], &event->event_info.got_ip.ip_info.ip.addr, sizeof(uint32_t));
-      txp.length = 3 + sizeof(uint32_t);
+      txp.dataLength = 3 + sizeof(uint32_t);
 
       ESP_LOGI(TAG, "0x%04X", (uint32_t) event->event_info.got_ip.ip_info.ip.addr);
 
@@ -170,20 +166,20 @@ static void wifi_init_sta(const char * ssid, const char * key)
 static void wifi_ctrl(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_CTRL_TASK);
   while (1) {
-    com_receive_wifi_ctrl_blocking((esp_routable_packet_t*) &rxp);
+    com_receive_wifi_ctrl_blocking(&rxp);
 
     switch (rxp.data[0]) {
       case WIFI_CTRL_SET_SSID:
         ESP_LOGI("WIFI", "Should set SSID");
-        memcpy(ssid, &rxp.data[1], rxp.length - 3);
-        ssid[rxp.length - 3 + 1] = 0;
+        memcpy(ssid, &rxp.data[1], rxp.dataLength - 1);
+        ssid[rxp.dataLength - 1 + 1] = 0;
         ESP_LOGD(TAG, "SSID: %s", ssid);
         // Save to NVS?
         break;
       case WIFI_CTRL_SET_KEY:
         ESP_LOGI("WIFI", "Should set password");
-        memcpy(key, &rxp.data[1], rxp.length - 3);
-        key[rxp.length - 3 + 1] = 0;
+        memcpy(key, &rxp.data[1], rxp.dataLength - 1);
+        key[rxp.dataLength - 1 + 1] = 0;
         ESP_LOGD(TAG, "KEY: %s", key);
         // Save to NVS?
         break;
@@ -274,7 +270,7 @@ static void wifi_task(void *pvParameters) {
     txp.route.function = WIFI_CTRL;
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 1;    // connected
-    txp.length = 4;
+    txp.dataLength = 4;
     espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = STM32;
@@ -290,7 +286,7 @@ static void wifi_task(void *pvParameters) {
     txp.route.function = WIFI_CTRL;
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 0;    // disconnected
-    txp.length = 4;
+    txp.dataLength = 4;
     espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = STM32;
@@ -310,58 +306,66 @@ void wifi_send_packet(const char * buffer, size_t size) {
   }
 }
 
-static wifi_transport_packet_t txp_wifi;
 static void wifi_sending_task(void *pvParameters) {
+  static WifiTransportPacket_t txp_wifi;
+  static CPXRoutablePacket_t qPacket;
+
   xEventGroupSetBits(startUpEventGroup, START_UP_TX_TASK);
   while (1) {
-    xQueueReceive(wifiTxQueue, &txp_wifi, portMAX_DELAY);
-    wifi_send_packet((const char *)&txp_wifi, txp_wifi.length + 2);
+    xQueueReceive(wifiTxQueue, &qPacket, portMAX_DELAY);
+
+    txp_wifi.payloadLength = qPacket.dataLength + WIFI_TRANSPORT_MTU;
+
+    txp_wifi.routablePayload.route.source = qPacket.route.source;
+    txp_wifi.routablePayload.route.destination = qPacket.route.destination;
+    txp_wifi.routablePayload.route.function = qPacket.route.function;
+
+    memcpy(txp_wifi.routablePayload.data, qPacket.data, qPacket.dataLength);
+
+    wifi_send_packet((const char *)&txp_wifi, txp_wifi.payloadLength + 2);
   }
 }
 
-static esp_routable_packet_t rxp_wifi;
 static void wifi_receiving_task(void *pvParameters) {
+  static WifiTransportPacket_t rxp_wifi;
   int len;
 
   xEventGroupSetBits(startUpEventGroup, START_UP_RX_TASK);
   while (1) {
     len = recv(conn, &rxp_wifi, 2, 0);
     if (len > 0) {
-      ESP_LOGI(TAG, "Wire data length %i", rxp_wifi.length);
+      ESP_LOGI(TAG, "Wire data length %i", rxp_wifi.payloadLength);
       int totalRxLen = 0;
       do {
-        len = recv(conn, &(((uint8_t* ) &rxp_wifi.route)[totalRxLen]), rxp_wifi.length - totalRxLen, 0);
+        len = recv(conn, &rxp_wifi.payload[totalRxLen], rxp_wifi.payloadLength - totalRxLen, 0);
         ESP_LOGI(TAG, "Read %i bytes", len);
         totalRxLen += len;
-      } while (totalRxLen < rxp_wifi.length);
+      } while (totalRxLen < rxp_wifi.payloadLength);
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
-      xQueueSend(wifiRxQueue, &rxp_wifi, (TickType_t)portMAX_DELAY);
+      xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
     } else {
       vTaskDelay(10);
     }
   }
 }
 
-void wifi_transport_send(const uint8_t* data, const uint16_t dataLen) {
-  static wifi_transport_packet_t txBuffer;
-
-  assert(dataLen <= WIFI_TRANSPORT_MTU);
-
-  xSemaphoreTake(transportSendLock, portMAX_DELAY);
-  txBuffer.length = dataLen;
-  memcpy(txBuffer.data, data, dataLen);
-
-  xQueueSend(wifiTxQueue, &txBuffer, portMAX_DELAY);
-  xSemaphoreGive(transportSendLock);
+void wifi_transport_send(const CPXRoutablePacket_t* packet) {
+  assert(packet->dataLength <= WIFI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+  xQueueSend(wifiTxQueue, packet, portMAX_DELAY);
 }
 
-uint16_t wifi_transport_receive(uint8_t* data) {
-  static wifi_transport_packet_t rxBuffer;
+void wifi_transport_receive(CPXRoutablePacket_t* packet) {
+  // Not reentrant safe. Assuming only one task is popping the queue
+  static WifiTransportPacket_t qPacket;
+  xQueueReceive(wifiRxQueue, &qPacket, portMAX_DELAY);
 
-  xQueueReceive(wifiRxQueue, &rxBuffer, portMAX_DELAY);
-  memcpy(data, rxBuffer.data, rxBuffer.length);
+  packet->dataLength = qPacket.payloadLength - CPX_ROUTING_PACKED_SIZE;
 
-  return rxBuffer.length;
+  packet->route.source = qPacket.routablePayload.route.source;
+  packet->route.destination = qPacket.routablePayload.route.destination;
+  packet->route.function = qPacket.routablePayload.route.function;
+
+  memcpy(packet->data, qPacket.routablePayload.data, packet->dataLength);
 }
 
 void wifi_init() {
@@ -369,11 +373,8 @@ void wifi_init() {
 
   s_wifi_event_group = xEventGroupCreate();
 
-  wifiRxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
-  wifiTxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, WIFI_HOST_QUEUE_SIZE);
-
-  transportSendLock = xSemaphoreCreateMutexStatic(&transportSendLockBuffer);
-  configASSERT(transportSendLock);
+  wifiRxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, sizeof(WifiTransportPacket_t));
+  wifiTxQueue = xQueueCreate(WIFI_HOST_QUEUE_LENGTH, sizeof(CPXRoutablePacket_t));
 
   startUpEventGroup = xEventGroupCreate();
   xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK | START_UP_CTRL_TASK);

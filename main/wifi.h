@@ -12,13 +12,21 @@
 #endif
 
 typedef struct {
-    uint16_t length;
-    uint8_t data[WIFI_TRANSPORT_MTU];
-} __attribute__((packed)) wifi_transport_packet_t;
+    CPXRoutingPacked_t route;
+    uint8_t data[WIFI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE];
+} __attribute__((packed)) WifiTransportPayload_t;
+
+typedef struct {
+    uint16_t payloadLength;
+    union {
+        WifiTransportPayload_t routablePayload;
+        uint8_t payload[WIFI_TRANSPORT_MTU];
+    };
+} __attribute__((packed)) WifiTransportPacket_t;
 
 
 void wifi_init();
 
-void wifi_transport_send(const uint8_t* data, const uint16_t dataLen);
-
-uint16_t wifi_transport_receive(uint8_t* data);
+// Interface used by the router
+void wifi_transport_send(const CPXRoutablePacket_t* packet);
+void wifi_transport_receive(CPXRoutablePacket_t* packet);

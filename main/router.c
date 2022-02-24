@@ -21,19 +21,19 @@ typedef struct {
 } RouteContext_t;
 
 static RouteContext_t wifi_task_context;
-static uint8_t wifiRxBuf[WIFI_TRANSPORT_MTU];
+static CPXRoutablePacket_t wifiRxBuf;
 
 static RouteContext_t gap8_task_context;
-static uint8_t spiRxBuf[SPI_TRANSPORT_MTU];
+static CPXRoutablePacket_t spiRxBuf;
 
 static RouteContext_t cf_task_context;
-static uint8_t uartRxBuf[UART_TRANSPORT_MTU];
+static CPXRoutablePacket_t uartRxBuf;
 
 static RouteContext_t esp_task_context;
-static uint8_t espRxBuf[ESP_TRANSPORT_MTU];
+static CPXRoutablePacket_t espRxBuf;
 
-typedef uint16_t (*Receiver_t)(uint8_t* data);
-typedef void (*Sender_t)(const uint8_t* data, const uint16_t dataLength);
+typedef void (*Receiver_t)(CPXRoutablePacket_t* packet);
+typedef void (*Sender_t)(const CPXRoutablePacket_t* packet);
 
 static const int START_UP_GAP8_ROUTER_RUNNING = BIT0;
 static const int START_UP_CF_ROUTER_RUNNING = BIT1;
@@ -41,66 +41,66 @@ static const int START_UP_ESP_ROUTER_RUNNING = BIT2;
 static const int START_UP_WIFI_ROUTER_RUNNING = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
-static void splitAndSend(const CPXRoutablePacket_t* rxp, const uint16_t cpxDataLength, RouteContext_t* context, Sender_t sender) {
-  // TODO krri Split packet if needed
-  context->txp.route = rxp->route;
-  memcpy(context->txp.data, rxp->data, cpxDataLength);
+static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context, Sender_t sender) {
+  CPXRoutablePacket_t* txp = &context->txp;
 
-  const uint16_t transportBufLength = cpxDataLength + CPX_ROUTING_INFO_SIZE;
-  sender((uint8_t*)&context->txp, transportBufLength);
+  // TODO krri Split packet if needed
+  txp->route = rxp->route;
+  memcpy(txp->data, rxp->data, rxp->dataLength);
+
+  txp->dataLength = rxp->dataLength;
+  sender(txp);
 }
 
-static void route(Receiver_t receive, uint8_t* rxBuf, RouteContext_t* context) {
+static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* context, const char* routerName) {
   while(1) {
-    uint16_t rxBufLength = receive(rxBuf);
+    receive(rxp);
 
-    CPXRoutablePacket_t* rxp = (CPXRoutablePacket_t*)rxBuf;
-    const uint16_t cpxDataLength = rxBufLength - CPX_ROUTING_INFO_SIZE;
+    const uint8_t source = rxp->route.source;
+    const uint8_t destination = rxp->route.destination;
+    const uint16_t cpxDataLength = rxp->dataLength;
 
-    switch (rxp->route.destination) {
+    switch (destination) {
       case GAP8:
-        ESP_LOGD("ROUTER", "[0x%02X] -> GAP8 [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
-        splitAndSend(rxp, rxBufLength, context, spi_transport_send);
+        ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+        splitAndSend(rxp, context, spi_transport_send);
         break;
       case STM32:
-        ESP_LOGD("ROUTER", "[0x%02X] -> STM32 [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
-        splitAndSend(rxp, rxBufLength, context, uart_transport_send);
+        ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+        splitAndSend(rxp, context, uart_transport_send);
         break;
       case ESP32:
-        ESP_LOGD("ROUTER", "[0x%02X] -> ESP32 [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
-        splitAndSend(rxp, rxBufLength, context, espTransportSend);
+        ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+        splitAndSend(rxp, context, espTransportSend);
         break;
       case HOST:
-        ESP_LOGD("ROUTER", "[0x%02X] -> HOST [0x%02X] (%u)", rxp->route.source, rxp->route.destination, cpxDataLength);
-        splitAndSend(rxp, rxBufLength, context, wifi_transport_send);
+        ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+        splitAndSend(rxp, context, wifi_transport_send);
         break;
       default:
-        ESP_LOGW("ROUTER", "Cannot route from [0x%02X] to [0x%02X]", rxp->route.source, rxp->route.destination);
+        ESP_LOGW("ROUTER", "Cannot route from %s [0x%02X] to [0x%02X]", routerName, source, destination);
     }
   }
 }
 
 static void router_from_gap8(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_GAP8_ROUTER_RUNNING);
-  route(spi_transport_receive, spiRxBuf, &gap8_task_context);
+  route(spi_transport_receive, &spiRxBuf, &gap8_task_context, "GAP8");
 }
 
 static void router_from_crazyflie(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_CF_ROUTER_RUNNING);
-  route(uart_transport_receive, uartRxBuf, &cf_task_context);
+  route(uart_transport_receive, &uartRxBuf, &cf_task_context, "STM32");
 }
 
 static void router_from_esp32(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_ESP_ROUTER_RUNNING);
-  route(espTransportReceive, espRxBuf, &esp_task_context);
+  route(espTransportReceive, &espRxBuf, &esp_task_context, "ESP32");
 }
 
 static void router_from_wifi(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_WIFI_ROUTER_RUNNING);
-  // TODO: krri Fix this (wifi needs to be split, since it's being used from routing and using routing)
-  vTaskDelay(100);
-
-  route(wifi_transport_receive, wifiRxBuf, &wifi_task_context);
+  route(wifi_transport_receive, &wifiRxBuf, &wifi_task_context, "HOST");
 }
 
 
