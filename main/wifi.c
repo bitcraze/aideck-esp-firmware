@@ -161,8 +161,6 @@ static void wifi_init_sta(const char * ssid, const char * key)
   ESP_LOGI(TAG, "wifi_init_sta finished.");
 }
 
-// TODO krri Break up transport from functionality
-
 static void wifi_ctrl(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_CTRL_TASK);
   while (1) {

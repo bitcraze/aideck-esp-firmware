@@ -23,7 +23,7 @@
 #define SPI_MISO_GPIO 23
 #define SPI_SCLK_GPIO 18
 
-#define SPI_BUFFER_LEN (SPI_TRANSPORT_MTU + 2)
+#define SPI_BUFFER_LEN (sizeof(SpiBuffer_t) + 2)
 
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
@@ -31,8 +31,8 @@
 // #define DEBUG(...) ESP_LOGI("SPI", __VA_ARGS__)
 #define DEBUG(...)
 
-static uint8_t * tx_buffer;
-static uint8_t * rx_buffer;
+static SpiBuffer_t* tx_buffer;
+static SpiBuffer_t* rx_buffer;
 
 static xQueueHandle tx_queue;
 static xQueueHandle rx_queue;
@@ -82,29 +82,25 @@ static void spi_task(void* _param) {
             DEBUG("Some data to send ...\n");
             // Set the length byte and copy the packet to the TX buffer
             const uint16_t payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
-            tx_buffer[0] = payloadLength;
-            tx_buffer[1] = payloadLength >> 8;
+            tx_buffer->structuredData.dataLength = payloadLength;
 
-            CPXRoutingPacked_t routing;
-            routing.source = qPacket.route.source;
-            routing.destination = qPacket.route.destination;
-            routing.function = qPacket.route.function;
-            memcpy(&tx_buffer[2], &routing, CPX_ROUTING_PACKED_SIZE);
+            tx_buffer->structuredData.route.source = qPacket.route.source;
+            tx_buffer->structuredData.route.destination = qPacket.route.destination;
+            tx_buffer->structuredData.route.function = qPacket.route.function;
 
-            memcpy(&tx_buffer[2 + CPX_ROUTING_PACKED_SIZE], qPacket.data, qPacket.dataLength);
+            memcpy(tx_buffer->structuredData.data, qPacket.data, qPacket.dataLength);
         } else {
             // Nothing to send, length byte=0
-            tx_buffer[0] = 0;
-            tx_buffer[1] = 0;
+            tx_buffer->structuredData.dataLength = 0;
         }
 
-        DEBUG("About to send %d bytes\n", tx_buffer[0] | (tx_buffer[1] << 8));
+        DEBUG("About to send %d bytes\n", tx_buffer->raw[0] | (tx_buffer->raw[1] << 8));
 
         // Trigger the transfer!
         spi_slave_transaction_t transaction = {
             .length = SPI_BUFFER_LEN*8,
-            .tx_buffer = tx_buffer,
-            .rx_buffer = rx_buffer,
+            .tx_buffer = tx_buffer->raw,
+            .rx_buffer = rx_buffer->raw,
         };
 
         DEBUG("Transaction ...\n");
@@ -112,10 +108,10 @@ static void spi_task(void* _param) {
 
         DEBUG("Transferred: %dB\n", transaction.trans_len/8);
 
-        int rx_len  = rx_buffer[0] + (((int)rx_buffer[1]) << 8);
-        DEBUG("Rx[%d]\n", rx_buffer[0]);
+        int rx_len  = rx_buffer->structuredData.dataLength;
+        DEBUG("Rx[%d]\n", rx_buffer->raw[0]);
         for (int i=0; i<rx_len; i++) {
-            DEBUG(" %02x", rx_buffer[i+1]);
+            DEBUG(" %02x", rx_buffer->raw[i + 1]);
         }
         DEBUG("\n");
 
@@ -123,13 +119,11 @@ static void spi_task(void* _param) {
         if (rx_len != 0) {
             qPacket.dataLength = rx_len - CPX_ROUTING_PACKED_SIZE;
 
-            CPXRoutingPacked_t routing;
-            memcpy(&routing, &rx_buffer[2], CPX_ROUTING_PACKED_SIZE);
-            qPacket.route.source = routing.source;
-            qPacket.route.destination = routing.destination;
-            qPacket.route.function = routing.function;
+            qPacket.route.source = rx_buffer->structuredData.route.source;
+            qPacket.route.destination = rx_buffer->structuredData.route.destination;
+            qPacket.route.function = rx_buffer->structuredData.route.function;
 
-            memcpy(qPacket.data, &rx_buffer[2 + CPX_ROUTING_PACKED_SIZE], qPacket.dataLength);
+            memcpy(qPacket.data, &rx_buffer->structuredData.data, qPacket.dataLength);
             xQueueSend(rx_queue, &qPacket, portMAX_DELAY);
         }
     }

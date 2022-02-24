@@ -13,9 +13,15 @@
 #endif
 
 typedef struct {
-    uint16_t length;
-    uint8_t data[SPI_TRANSPORT_MTU];
-} __attribute__((packed)) spi_transport_packet_t;
+    uint16_t dataLength;
+    CPXRoutingPacked_t route;
+    uint8_t data[SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE];
+} __attribute__((packed)) SpiStructuredData_t;
+
+typedef union {
+    uint8_t raw[SPI_TRANSPORT_MTU + 2];
+    SpiStructuredData_t structuredData;
+} __attribute__((packed)) SpiBuffer_t;
 
 void spi_transport_init();
 
