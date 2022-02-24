@@ -42,6 +42,7 @@
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include <lwip/netdb.h>
+#include "esp_netif.h"
 
 #include "com.h"
 
@@ -88,61 +89,80 @@ enum {
 };
 
 /* WiFi event handler */
-static esp_err_t event_handler(void *ctx, system_event_t *event)
+static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t eventId, void* eventData)
 {
-  switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-      ESP_ERROR_CHECK(esp_wifi_connect());
-      break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-      ESP_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->event_info.got_ip.ip_info.ip));
-
-      wifi_ap_record_t ap_info;
-      ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
-      ESP_LOGD(TAG, "BSAP MAC is %x:%x:%x:%x:%x:%x",
-          ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
-          ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
-      ESP_LOGI(TAG, "country: %s", ap_info.country.cc);
-      ESP_LOGI(TAG, "rssi: %d", ap_info.rssi);
-      ESP_LOGI(TAG, "11b: %d, 11g: %d, 11n: %d, lr: %d",
-        ap_info.phy_11b, ap_info.phy_11g, ap_info.phy_11n, ap_info.phy_lr);
-
-      txp.route.destination = GAP8;
-      txp.route.source = ESP32;
-      txp.route.function = WIFI_CTRL;
-      txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
-      memcpy(&txp.data[1], &event->event_info.got_ip.ip_info.ip.addr, sizeof(uint32_t));
-      txp.dataLength = 3 + sizeof(uint32_t);
-
-      ESP_LOGI(TAG, "0x%04X", (uint32_t) event->event_info.got_ip.ip_info.ip.addr);
-
-      // TODO: We should probably not block here...
-      espAppSendToRouterBlocking(&txp);
-
-      txp.route.destination = STM32;
-      espAppSendToRouterBlocking(&txp);
-
-      xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-      break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-      ESP_ERROR_CHECK(esp_wifi_connect());
-      xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-      ESP_LOGI(TAG,"Disconnected from access point");
-      break;
-    case SYSTEM_EVENT_AP_STACONNECTED:
-      ESP_LOGI(TAG, "station:"MACSTR" join, AID=%d",
-                MAC2STR(event->event_info.sta_connected.mac),
-                event->event_info.sta_connected.aid);
-      break;
-    case SYSTEM_EVENT_AP_STADISCONNECTED:
-      ESP_LOGI(TAG, "station:"MACSTR"leave, AID=%d",
-                MAC2STR(event->event_info.sta_disconnected.mac),
-                event->event_info.sta_disconnected.aid);
-      break;
-    default:
+  if (eventBase == WIFI_EVENT) {
+    switch(eventId) {
+      case WIFI_EVENT_STA_START:
+        ESP_ERROR_CHECK(esp_wifi_connect());
         break;
+      case WIFI_EVENT_STA_DISCONNECTED:
+        ESP_ERROR_CHECK(esp_wifi_connect());
+        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        ESP_LOGI(TAG,"Disconnected from access point");
+        break;
+      case WIFI_EVENT_AP_STACONNECTED:
+        {
+          wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*)eventData;
+          ESP_LOGI(TAG, "station:"MACSTR" join, AID=%d",
+                    MAC2STR(event->mac),
+                    event->aid);
+        }
+        break;
+      case WIFI_EVENT_AP_STADISCONNECTED:
+        {
+          wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*)eventData;
+          ESP_LOGI(TAG, "station:"MACSTR"leave, AID=%d",
+                    MAC2STR(event->mac),
+                    event->aid);
+        }
+        break;
+      default:
+        // Fall through
+        break;
+    }
   }
-  return ESP_OK;
+
+  if (eventBase == IP_EVENT) {
+    switch (eventId) {
+      case IP_EVENT_STA_GOT_IP:
+        {
+          ip_event_got_ip_t* event = (ip_event_got_ip_t*)eventData;
+          ESP_LOGI(TAG, "got ip: " IPSTR, IP2STR(&event->ip_info.ip));
+
+          wifi_ap_record_t ap_info;
+          ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(&ap_info));
+          ESP_LOGD(TAG, "BSAP MAC is %x:%x:%x:%x:%x:%x",
+              ap_info.bssid[0], ap_info.bssid[1], ap_info.bssid[2],
+              ap_info.bssid[3], ap_info.bssid[4], ap_info.bssid[5]);
+          ESP_LOGI(TAG, "country: %s", ap_info.country.cc);
+          ESP_LOGI(TAG, "rssi: %d", ap_info.rssi);
+          ESP_LOGI(TAG, "11b: %d, 11g: %d, 11n: %d, lr: %d",
+            ap_info.phy_11b, ap_info.phy_11g, ap_info.phy_11n, ap_info.phy_lr);
+
+          txp.route.destination = GAP8;
+          txp.route.source = ESP32;
+          txp.route.function = WIFI_CTRL;
+          txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
+          memcpy(&txp.data[1], &event->ip_info.ip.addr, sizeof(uint32_t));
+          txp.dataLength = 3 + sizeof(uint32_t);
+
+          ESP_LOGI(TAG, "0x%04X", (uint32_t) event->ip_info.ip.addr);
+
+          // TODO: We should probably not block here...
+          espAppSendToRouterBlocking(&txp);
+
+          txp.route.destination = STM32;
+          espAppSendToRouterBlocking(&txp);
+
+          xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        }
+        break;
+      default:
+        // Fall through
+        break;
+    }
+  }
 }
 
 /* Initialize WiFi as AP */
@@ -265,7 +285,9 @@ void wifi_wait_for_disconnect() {
 static void wifi_task(void *pvParameters) {
 
   s_wifi_event_group = xEventGroupCreate();
-  ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
+
+  esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, event_handler, NULL, NULL);
+  esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, event_handler, NULL, NULL);
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -391,7 +413,9 @@ void wifi_transport_receive(CPXRoutablePacket_t* packet) {
 }
 
 void wifi_init() {
-  tcpip_adapter_init();
+  esp_netif_init();
+  esp_netif_t* sta_netif = esp_netif_create_default_wifi_sta();
+  assert(sta_netif);
 
   s_wifi_event_group = xEventGroupCreate();
 
