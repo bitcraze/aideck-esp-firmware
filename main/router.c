@@ -65,15 +65,26 @@ static const int START_UP_ESP_ROUTER_RUNNING = BIT2;
 static const int START_UP_WIFI_ROUTER_RUNNING = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
-static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context, Sender_t sender) {
+static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context, Sender_t sender, const uint16_t mtu) {
   CPXRoutablePacket_t* txp = &context->txp;
 
-  // TODO krri Split packet if needed
   txp->route = rxp->route;
-  memcpy(txp->data, rxp->data, rxp->dataLength);
 
-  txp->dataLength = rxp->dataLength;
-  sender(txp);
+  uint16_t remainingToSend = rxp->dataLength;
+  const uint8_t* startOfDataToSend = rxp->data;
+  while (remainingToSend > 0) {
+    uint16_t toSend = remainingToSend;
+    if (toSend > mtu) {
+      toSend = mtu;
+    }
+
+    memcpy(txp->data, startOfDataToSend, toSend);
+    txp->dataLength = toSend;
+    sender(txp);
+
+    remainingToSend -= toSend;
+    startOfDataToSend += toSend;
+  }
 }
 
 static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* context, const char* routerName) {
@@ -87,19 +98,19 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
     switch (destination) {
       case GAP8:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, spi_transport_send);
+        splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU);
         break;
       case STM32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, uart_transport_send);
+        splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU);
         break;
       case ESP32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, espTransportSend);
+        splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU);
         break;
       case HOST:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, wifi_transport_send);
+        splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU);
         break;
       default:
         ESP_LOGW("ROUTER", "Cannot route from %s [0x%02X] to [0x%02X]", routerName, source, destination);
