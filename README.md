@@ -25,6 +25,10 @@ $ idf.py monitor
 
 [Esp32 IDF]: https://github.com/espressif/esp-idf.git
 
+### Flash using the builder image
+
+docker run --rm -it -v $PWD:/module/ --device /dev/ttyUSB0 --privileged -P bitcraze/builder /bin/bash -c "openocd -f interface/ftdi/olimex-arm-usb-tiny-h.cfg -f board/esp-wroom-32.cfg -c 'adapter_khz 20000' -c 'program_esp build/bootloader/bootloader.bin 0x1000 verify' -c 'program_esp build/aideck_esp.bin 0x10000 verify reset exit'"
+
 ### Build with the [toolbelt](https://github.com/bitcraze/toolbelt)
 
 When using the [toolbelt](https://github.com/bitcraze/toolbelt) the required toolchain is running in a docker container
