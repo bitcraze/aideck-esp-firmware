@@ -55,8 +55,8 @@ static void test_rx(void* _param) {
   while (1) {
     com_receive_test_blocking(&rxp);
     switch(rxp.route.source) {
-      case 0x0: ESP_LOGD("TEST", "Request from STM32"); break;
-      case 0x2: ESP_LOGD("TEST", "Request from GAP8"); break;
+      case CPX_T_STM32: ESP_LOGD("TEST", "Request from STM32"); break;
+      case CPX_T_GAP8: ESP_LOGD("TEST", "Request from GAP8"); break;
       default: ESP_LOGW("TEST", "Request from UNKNOWN"); break;
     }
 

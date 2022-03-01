@@ -96,19 +96,19 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
     const uint16_t cpxDataLength = rxp->dataLength;
 
     switch (destination) {
-      case GAP8:
+      case CPX_T_GAP8:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
         splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU);
         break;
-      case STM32:
+      case CPX_T_STM32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
         splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU);
         break;
-      case ESP32:
+      case CPX_T_ESP32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
         splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU);
         break;
-      case HOST:
+      case CPX_T_HOST:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
         splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU);
         break;

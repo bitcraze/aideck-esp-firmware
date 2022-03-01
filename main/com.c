@@ -65,10 +65,10 @@ static void com_rx(void* _param) {
     ESP_LOGD("COM", "Received packet for 0x%02X", rxp.route.destination);
     ESP_LOG_BUFFER_HEX_LEVEL("COM", &rxp, 10, ESP_LOG_DEBUG);
     switch (rxp.route.function) {
-      case TEST:
+      case CPX_F_TEST:
         xQueueSend(espTESTQueue, &rxp, (TickType_t) portMAX_DELAY);
         break;
-      case WIFI_CTRL:
+      case CPX_F_WIFI_CTRL:
         xQueueSend(espWiFiCTRLQueue, &rxp, (TickType_t) portMAX_DELAY);
         break;
       default:

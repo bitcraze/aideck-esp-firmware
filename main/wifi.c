@@ -140,9 +140,9 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
           ESP_LOGI(TAG, "11b: %d, 11g: %d, 11n: %d, lr: %d",
             ap_info.phy_11b, ap_info.phy_11g, ap_info.phy_11n, ap_info.phy_lr);
 
-          txp.route.destination = GAP8;
-          txp.route.source = ESP32;
-          txp.route.function = WIFI_CTRL;
+          txp.route.destination = CPX_T_GAP8;
+          txp.route.source = CPX_T_ESP32;
+          txp.route.function = CPX_F_WIFI_CTRL;
           txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
           memcpy(&txp.data[1], &event->ip_info.ip.addr, sizeof(uint32_t));
           txp.dataLength = 3 + sizeof(uint32_t);
@@ -152,7 +152,7 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
           // TODO: We should probably not block here...
           espAppSendToRouterBlocking(&txp);
 
-          txp.route.destination = STM32;
+          txp.route.destination = CPX_T_STM32;
           espAppSendToRouterBlocking(&txp);
 
           xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
@@ -309,15 +309,15 @@ static void wifi_task(void *pvParameters) {
     //blink_period_ms = 100;
 
     // Not thread safe!
-    txp.route.source = ESP32;
-    txp.route.destination = GAP8;
-    txp.route.function = WIFI_CTRL;
+    txp.route.source = CPX_T_ESP32;
+    txp.route.destination = CPX_T_GAP8;
+    txp.route.function = CPX_F_WIFI_CTRL;
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 1;    // connected
     txp.dataLength = 4;
     espAppSendToRouterBlocking(&txp);
 
-    txp.route.destination = STM32;
+    txp.route.destination = CPX_T_STM32;
     espAppSendToRouterBlocking(&txp);
 
     // Probably not the best, should be handled in some other way?
@@ -325,15 +325,15 @@ static void wifi_task(void *pvParameters) {
     ESP_LOGI(TAG, "Client disconnected");
 
     // Not thread safe!
-    txp.route.source = ESP32;
-    txp.route.destination = GAP8;
-    txp.route.function = WIFI_CTRL;
+    txp.route.source = CPX_T_ESP32;
+    txp.route.destination = CPX_T_GAP8;
+    txp.route.function = CPX_F_WIFI_CTRL;
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 0;    // disconnected
     txp.dataLength = 4;
     espAppSendToRouterBlocking(&txp);
 
-    txp.route.destination = STM32;
+    txp.route.destination = CPX_T_STM32;
     espAppSendToRouterBlocking(&txp);
   }
 }
