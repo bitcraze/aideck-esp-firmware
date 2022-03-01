@@ -1,2 +1,12 @@
-idf_component_register(SRCS "wifi.c" "test.c" "com.c" "router.c" "uart_transport.c" "aideck_esp_main.c" "led.c" "spi_transport.c" "led.c" "esp_transport.c"
-                    INCLUDE_DIRS "")
+idf_component_register(SRCS "wifi.c"
+                            "test.c"
+                            "com.c"
+                            "router.c"
+                            "uart_transport.c"
+                            "aideck_esp_main.c"
+                            "led.c"
+                            "spi_transport.c"
+                            "led.c"
+                            "esp_transport.c"
+                            "cpx.c"
+                        INCLUDE_DIRS "")

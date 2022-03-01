@@ -108,10 +108,7 @@ static void spi_task(void* _param) {
             const uint16_t payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
             tx_buffer->structuredData.dataLength = payloadLength;
 
-            tx_buffer->structuredData.route.source = qPacket.route.source;
-            tx_buffer->structuredData.route.destination = qPacket.route.destination;
-            tx_buffer->structuredData.route.function = qPacket.route.function;
-
+            cpxRouteToPacked(&qPacket.route, &tx_buffer->structuredData.route);
             memcpy(tx_buffer->structuredData.data, qPacket.data, qPacket.dataLength);
         } else {
             // Nothing to send, length byte=0
@@ -143,9 +140,7 @@ static void spi_task(void* _param) {
         if (rx_len != 0) {
             qPacket.dataLength = rx_len - CPX_ROUTING_PACKED_SIZE;
 
-            qPacket.route.source = rx_buffer->structuredData.route.source;
-            qPacket.route.destination = rx_buffer->structuredData.route.destination;
-            qPacket.route.function = rx_buffer->structuredData.route.function;
+            cpxPackedToRoute(&rx_buffer->structuredData.route, &qPacket.route);
 
             memcpy(qPacket.data, &rx_buffer->structuredData.data, qPacket.dataLength);
             xQueueSend(rx_queue, &qPacket, portMAX_DELAY);

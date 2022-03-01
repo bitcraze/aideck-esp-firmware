@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
 
 // This enum is used to identify source and destination for CPX routing information
 typedef enum {
@@ -70,3 +72,7 @@ typedef struct {
   uint16_t dataLength;
   uint8_t data[CPX_MAX_PAYLOAD_SIZE - CPX_ROUTING_PACKED_SIZE];
 } CPXRoutablePacket_t;
+
+void cpxInitRoute(const CPXTarget_t source, const CPXTarget_t destination, const CPXFunction_t function, CPXRouting_t* route);
+void cpxRouteToPacked(const CPXRouting_t* route, CPXRoutingPacked_t* packed);
+void cpxPackedToRoute(const CPXRoutingPacked_t* packed, CPXRouting_t* route);

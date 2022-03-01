@@ -140,9 +140,7 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
           ESP_LOGI(TAG, "11b: %d, 11g: %d, 11n: %d, lr: %d",
             ap_info.phy_11b, ap_info.phy_11g, ap_info.phy_11n, ap_info.phy_lr);
 
-          txp.route.destination = CPX_T_GAP8;
-          txp.route.source = CPX_T_ESP32;
-          txp.route.function = CPX_F_WIFI_CTRL;
+          cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
           txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
           memcpy(&txp.data[1], &event->ip_info.ip.addr, sizeof(uint32_t));
           txp.dataLength = 3 + sizeof(uint32_t);
@@ -309,9 +307,7 @@ static void wifi_task(void *pvParameters) {
     //blink_period_ms = 100;
 
     // Not thread safe!
-    txp.route.source = CPX_T_ESP32;
-    txp.route.destination = CPX_T_GAP8;
-    txp.route.function = CPX_F_WIFI_CTRL;
+    cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 1;    // connected
     txp.dataLength = 4;
@@ -325,9 +321,7 @@ static void wifi_task(void *pvParameters) {
     ESP_LOGI(TAG, "Client disconnected");
 
     // Not thread safe!
-    txp.route.source = CPX_T_ESP32;
-    txp.route.destination = CPX_T_GAP8;
-    txp.route.function = CPX_F_WIFI_CTRL;
+    cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 0;    // disconnected
     txp.dataLength = 4;
@@ -360,9 +354,7 @@ static void wifi_sending_task(void *pvParameters) {
 
     txp_wifi.payloadLength = qPacket.dataLength + WIFI_TRANSPORT_MTU;
 
-    txp_wifi.routablePayload.route.source = qPacket.route.source;
-    txp_wifi.routablePayload.route.destination = qPacket.route.destination;
-    txp_wifi.routablePayload.route.function = qPacket.route.function;
+    cpxRouteToPacked(&qPacket.route, &txp_wifi.routablePayload.route);
 
     memcpy(txp_wifi.routablePayload.data, qPacket.data, qPacket.dataLength);
 
@@ -405,9 +397,7 @@ void wifi_transport_receive(CPXRoutablePacket_t* packet) {
 
   packet->dataLength = qPacket.payloadLength - CPX_ROUTING_PACKED_SIZE;
 
-  packet->route.source = qPacket.routablePayload.route.source;
-  packet->route.destination = qPacket.routablePayload.route.destination;
-  packet->route.function = qPacket.routablePayload.route.function;
+  cpxPackedToRoute(&qPacket.routablePayload.route, &packet->route);
 
   memcpy(packet->data, qPacket.routablePayload.data, packet->dataLength);
 }

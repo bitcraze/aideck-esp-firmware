@@ -104,9 +104,7 @@ static void uart_tx_task(void* _param) {
 
       txp.payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
 
-      txp.routablePayload.route.source = qPacket.route.source;
-      txp.routablePayload.route.destination = qPacket.route.destination;
-      txp.routablePayload.route.function = qPacket.route.function;
+      cpxRouteToPacked(&qPacket.route, &txp.routablePayload.route);
 
       memcpy(txp.routablePayload.data, qPacket.data, txp.payloadLength);
 
@@ -220,9 +218,7 @@ void uart_transport_receive(CPXRoutablePacket_t* packet) {
 
   packet->dataLength = rxp.payloadLength - CPX_ROUTING_PACKED_SIZE;
 
-  packet->route.source = rxp.routablePayload.route.source;
-  packet->route.destination = rxp.routablePayload.route.destination;
-  packet->route.function = rxp.routablePayload.route.function;
+  cpxPackedToRoute(&rxp.routablePayload.route, &packet->route);
 
   memcpy(packet->data, rxp.routablePayload.data, packet->dataLength);
 }
