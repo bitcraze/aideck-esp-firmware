@@ -48,6 +48,7 @@ typedef enum {
 typedef struct {
   CPXTarget_t destination;
   CPXTarget_t source;
+  bool lastPacket;
   CPXFunction_t function;
 } CPXRouting_t;
 
@@ -57,6 +58,8 @@ typedef struct {
 typedef struct {
   CPXTarget_t destination : 4;
   CPXTarget_t source : 4;
+  bool lastPacket : 1;
+  bool reserved : 1;
   CPXFunction_t function : 8;
 } __attribute__((packed)) CPXRoutingPacked_t;
 

@@ -74,12 +74,15 @@ static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context
   const uint8_t* startOfDataToSend = rxp->data;
   while (remainingToSend > 0) {
     uint16_t toSend = remainingToSend;
+    bool lastPacket = rxp->route.lastPacket;
     if (toSend > mtu) {
       toSend = mtu;
+      lastPacket = false;
     }
 
     memcpy(txp->data, startOfDataToSend, toSend);
     txp->dataLength = toSend;
+    txp->route.lastPacket = lastPacket;
     sender(txp);
 
     remainingToSend -= toSend;
@@ -91,8 +94,8 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
   while(1) {
     receive(rxp);
 
-    const uint8_t source = rxp->route.source;
-    const uint8_t destination = rxp->route.destination;
+    const CPXTarget_t source = rxp->route.source;
+    const CPXTarget_t destination = rxp->route.destination;
     const uint16_t cpxDataLength = rxp->dataLength;
 
     switch (destination) {
