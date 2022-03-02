@@ -223,6 +223,7 @@ void spi_transport_init() {
 void spi_transport_send(const CPXRoutablePacket_t* packet) {
     assert(packet->dataLength <= SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
     xQueueSend(tx_queue, packet, portMAX_DELAY);
+    xEventGroupSetBits(task_event, TASK_EVENT);
 }
 
 void spi_transport_receive(CPXRoutablePacket_t* packet) {

@@ -352,7 +352,7 @@ static void wifi_sending_task(void *pvParameters) {
   while (1) {
     xQueueReceive(wifiTxQueue, &qPacket, portMAX_DELAY);
 
-    txp_wifi.payloadLength = qPacket.dataLength + WIFI_TRANSPORT_MTU;
+    txp_wifi.payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
 
     cpxRouteToPacked(&qPacket.route, &txp_wifi.routablePayload.route);
 

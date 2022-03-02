@@ -208,6 +208,8 @@ void uart_transport_send(const CPXRoutablePacket_t* packet) {
   assert(packet->dataLength <= UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
 
   xQueueSend(tx_queue, packet, portMAX_DELAY);
+
+  xEventGroupSetBits(evGroup, TXQ_EVENT);
 }
 
 void uart_transport_receive(CPXRoutablePacket_t* packet) {

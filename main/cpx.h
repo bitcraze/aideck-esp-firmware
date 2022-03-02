@@ -56,8 +56,8 @@ typedef struct {
 // should mainly be used to serialize data when tranfering. Unpacked formats
 // should be preferred in application code.
 typedef struct {
-  CPXTarget_t destination : 4;
-  CPXTarget_t source : 4;
+  CPXTarget_t destination : 3;
+  CPXTarget_t source : 3;
   bool lastPacket : 1;
   bool reserved : 1;
   CPXFunction_t function : 8;
