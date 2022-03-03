@@ -36,22 +36,6 @@
     #pragma warn "UART MTU bigger than defined by CPX"
 #endif
 
-
-typedef struct {
-    CPXRoutingPacked_t route;
-    uint8_t data[UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE];
-} __attribute__((packed)) uartTransportPayload_t;
-
-typedef struct {
-    uint8_t start;
-    uint8_t payloadLength;
-    union {
-        uartTransportPayload_t routablePayload;
-        uint8_t payload[UART_TRANSPORT_MTU];
-    };
-} __attribute__((packed)) uart_transport_packet_t;
-
-
 void uart_transport_init();
 
 // Interface used by the router
