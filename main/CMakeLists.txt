@@ -9,4 +9,5 @@ idf_component_register(SRCS "wifi.c"
                             "led.c"
                             "esp_transport.c"
                             "cpx.c"
+                            "system.c"
                         INCLUDE_DIRS "")

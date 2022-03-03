@@ -41,6 +41,7 @@
 #include "com.h"
 #include "test.h"
 #include "wifi.h"
+#include "system.h"
 
 /* The LED is connected on GPIO */
 #define BLINK_GPIO 4
@@ -170,6 +171,8 @@ void app_main(void)
 
     wifi_init();
     router_init();
+
+    system_init();
 
     vTaskDelay(200);
 

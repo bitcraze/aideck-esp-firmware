@@ -24,17 +24,18 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
+typedef enum {
+  SYSTEM_RESET_GAP8  = 0x10
+} __attribute__((packed)) SystemCommand_t;
 
-#include "cpx.h"
-#include "esp_transport.h"
+typedef struct {
+  SystemCommand_t cmd;
+} __attribute__((packed)) SystemCommandPacket_t;
 
-
-void com_init();
-
-void com_receive_test_blocking(esp_routable_packet_t * packet);
-
-void com_receive_wifi_ctrl_blocking(esp_routable_packet_t * packet);
-
-void com_receive_system_blocking(esp_routable_packet_t * packet);
+/**
+ * @brief Initialize the ESP system CPX sub-system
+ * 
+ * This will handle system tasks like resetting the GAP8.
+ * 
+ */
+void system_init();
