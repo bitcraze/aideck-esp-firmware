@@ -195,12 +195,17 @@ static void wifi_init_sta(const char * ssid, const char * key)
   strncpy((char *)wifi_config.sta.password, key, strlen(key));
   ESP_LOGD(TAG, "KEY is %u chars", strlen(key));
 
-  ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-  ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-  ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
-  ESP_ERROR_CHECK(esp_wifi_start() );
+  if (strlen(ssid) > 0 && strlen(key) > 0) {
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
+    ESP_ERROR_CHECK(esp_wifi_start() );
 
-  ESP_LOGI(TAG, "wifi_init_sta finished.");
+    ESP_LOGI(TAG, "wifi_init_sta finished.");
+  } else {
+    ESP_LOGI(TAG, "Not connecting to wifi, no SSID and/or KEY set");
+  }
+
 }
 
 static void wifi_ctrl(void* _param) {
@@ -225,10 +230,15 @@ static void wifi_ctrl(void* _param) {
         break;
       case WIFI_CTRL_WIFI_CONNECT:
         ESP_LOGD("WIFI", "Should connect");
-        if (rxp.data[1] == 0) {
-          wifi_init_sta(ssid, key);
+
+        if (conn != -1) {
+          ESP_LOGD("WIFI", "Client connected, not connecting wifi again");
         } else {
-          wifi_init_softap(ssid, key);
+          if (rxp.data[1] == 0) {
+            wifi_init_sta(ssid, key);
+          } else {
+            wifi_init_softap(ssid, key);
+          }          
         }
         break;
     }
@@ -379,6 +389,10 @@ static void wifi_receiving_task(void *pvParameters) {
       } while (totalRxLen < rxp_wifi.payloadLength);
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
       xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
+    } else if (len == 0) {
+      //vTaskDelay(10);
+      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+      //printf("No data!\n");
     } else {
       vTaskDelay(10);
     }
