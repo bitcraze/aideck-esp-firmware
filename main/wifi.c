@@ -145,8 +145,6 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
           memcpy(&txp.data[1], &event->ip_info.ip.addr, sizeof(uint32_t));
           txp.dataLength = 1 + sizeof(uint32_t);
 
-          ESP_LOGI(TAG, "0x%04X", (uint32_t) event->ip_info.ip.addr);
-
           // TODO: We should probably not block here...
           espAppSendToRouterBlocking(&txp);
 
@@ -215,14 +213,14 @@ static void wifi_ctrl(void* _param) {
 
     switch (rxp.data[0]) {
       case WIFI_CTRL_SET_SSID:
-        ESP_LOGI("WIFI", "Should set SSID");
+        ESP_LOGD("WIFI", "Should set SSID");
         memcpy(ssid, &rxp.data[1], rxp.dataLength - 1);
         ssid[rxp.dataLength - 1 + 1] = 0;
         ESP_LOGD(TAG, "SSID: %s", ssid);
         // Save to NVS?
         break;
       case WIFI_CTRL_SET_KEY:
-        ESP_LOGI("WIFI", "Should set password");
+        ESP_LOGD("WIFI", "Should set password");
         memcpy(key, &rxp.data[1], rxp.dataLength - 1);
         key[rxp.dataLength - 1 + 1] = 0;
         ESP_LOGD(TAG, "KEY: %s", key);
@@ -260,19 +258,19 @@ void wifi_bind_socket() {
   if (sock < 0) {
     ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
   }
-  ESP_LOGI(TAG, "Socket created");
+  ESP_LOGD(TAG, "Socket created");
 
   int err = bind(sock, (struct sockaddr *)&destAddr, sizeof(destAddr));
   if (err != 0) {
     ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
   }
-  ESP_LOGI(TAG, "Socket binded");
+  ESP_LOGD(TAG, "Socket binded");
 
   err = listen(sock, 1);
   if (err != 0) {
     ESP_LOGE(TAG, "Error occured during listen: errno %d", errno);
   }
-  ESP_LOGI(TAG, "Socket listening");
+  ESP_LOGD(TAG, "Socket listening");
 }
 
 void wifi_wait_for_socket_connected() {
@@ -380,11 +378,11 @@ static void wifi_receiving_task(void *pvParameters) {
   while (1) {
     len = recv(conn, &rxp_wifi, 2, 0);
     if (len > 0) {
-      ESP_LOGI(TAG, "Wire data length %i", rxp_wifi.payloadLength);
+      ESP_LOGD(TAG, "Wire data length %i", rxp_wifi.payloadLength);
       int totalRxLen = 0;
       do {
         len = recv(conn, &rxp_wifi.payload[totalRxLen], rxp_wifi.payloadLength - totalRxLen, 0);
-        ESP_LOGI(TAG, "Read %i bytes", len);
+        ESP_LOGD(TAG, "Read %i bytes", len);
         totalRxLen += len;
       } while (totalRxLen < rxp_wifi.payloadLength);
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
