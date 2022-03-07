@@ -92,7 +92,7 @@ static EventGroupHandle_t startUpEventGroup;
 #define START_UP_TX_RUNNING (1<<1)
 
 static uint8_t calcCrc(const uart_transport_packet_t* packet) {
-  const uint8_t* start = (const uint8_t*)&packet;
+  const uint8_t* start = (const uint8_t*) packet;
   const uint8_t* end = &packet->payload[packet->payloadLength];
 
   uint8_t crc = 0;
@@ -135,7 +135,7 @@ static void uart_tx_task(void* _param) {
     if (uxQueueMessagesWaiting(tx_queue) > 0) {
       // Dequeue and wait for either CTS or CTR
       xQueueReceive(tx_queue, &qPacket, 0);
-
+      txp.start = 0xFF;
       txp.payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
       cpxRouteToPacked(&qPacket.route, &txp.routablePayload.route);
       memcpy(txp.routablePayload.data, qPacket.data, txp.payloadLength);
@@ -154,7 +154,6 @@ static void uart_tx_task(void* _param) {
         }
       } while ((evBits & CTS_EVENT) != CTS_EVENT);
       ESP_LOGD("UART", "Sending packet");
-      txp.start = 0xFF;
       uart_write_bytes(UART_NUM_0, &txp, txp.payloadLength + UART_META_LENGTH);
     }
   }
