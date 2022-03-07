@@ -143,7 +143,7 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
           cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
           txp.data[0] = WIFI_CTRL_STATUS_WIFI_CONNECTED;
           memcpy(&txp.data[1], &event->ip_info.ip.addr, sizeof(uint32_t));
-          txp.dataLength = 3 + sizeof(uint32_t);
+          txp.dataLength = 1 + sizeof(uint32_t);
 
           ESP_LOGI(TAG, "0x%04X", (uint32_t) event->ip_info.ip.addr);
 
@@ -320,7 +320,7 @@ static void wifi_task(void *pvParameters) {
     cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 1;    // connected
-    txp.dataLength = 4;
+    txp.dataLength = 2;
     espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = CPX_T_STM32;
@@ -334,7 +334,7 @@ static void wifi_task(void *pvParameters) {
     cpxInitRoute(CPX_T_ESP32, CPX_T_GAP8, CPX_F_WIFI_CTRL, &txp.route);
     txp.data[0] = WIFI_CTRL_STATUS_CLIENT_CONNECTED;
     txp.data[1] = 0;    // disconnected
-    txp.dataLength = 4;
+    txp.dataLength = 2;
     espAppSendToRouterBlocking(&txp);
 
     txp.route.destination = CPX_T_STM32;
