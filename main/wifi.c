@@ -164,6 +164,9 @@ static void event_handler(void* handlerArg, esp_event_base_t eventBase, int32_t 
 /* Initialize WiFi as AP */
 static void wifi_init_softap(const char *ssid, const char* key)
 {
+  esp_netif_t* ap_netif = esp_netif_create_default_wifi_ap();
+  assert(ap_netif);
+
   wifi_config_t wifi_config = {
       .ap = {
           .ssid_len = strlen(ssid),
@@ -186,6 +189,9 @@ static void wifi_init_softap(const char *ssid, const char* key)
 
 static void wifi_init_sta(const char * ssid, const char * key)
 {
+  esp_netif_t* sta_netif = esp_netif_create_default_wifi_sta();
+  assert(sta_netif);
+
   wifi_config_t wifi_config;
   memset((void *)&wifi_config, 0, sizeof(wifi_config_t));
   strncpy((char *)wifi_config.sta.ssid, ssid, strlen(ssid));
@@ -416,8 +422,6 @@ void wifi_transport_receive(CPXRoutablePacket_t* packet) {
 
 void wifi_init() {
   esp_netif_init();
-  esp_netif_t* sta_netif = esp_netif_create_default_wifi_sta();
-  assert(sta_netif);
 
   s_wifi_event_group = xEventGroupCreate();
 
