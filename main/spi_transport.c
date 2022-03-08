@@ -52,7 +52,8 @@
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
 
-#define DEBUG(...) ESP_LOGD("SPI", __VA_ARGS__)
+//#define DEBUG(...) ESP_LOGD("SPI", __VA_ARGS__)
+#define DEBUG(...) 
 
 static SpiBuffer_t* tx_buffer;
 static SpiBuffer_t* rx_buffer;
@@ -129,10 +130,6 @@ static void spi_task(void* _param) {
         DEBUG("Transaction done: %dB", transaction.trans_len/8);
 
         int rx_len  = rx_buffer->structuredData.dataLength;
-        DEBUG("Rx[%d]\n", rx_buffer->raw[0]);
-        for (int i=0; i<rx_len; i++) {
-            DEBUG(" %02x", rx_buffer->raw[i + 1]);
-        }
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_len != 0) {
