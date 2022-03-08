@@ -174,8 +174,6 @@ void app_main(void)
 
     system_init();
 
-    vTaskDelay(200);
-
     while(1) {
         vTaskDelay(10);
         gpio_set_level(BLINK_GPIO, 1);
