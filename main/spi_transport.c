@@ -52,8 +52,7 @@
 #define TX_QUEUE_LENGTH 10
 #define RX_QUEUE_LENGTH 10
 
-// #define DEBUG(...) ESP_LOGI("SPI", __VA_ARGS__)
-#define DEBUG(...)
+#define DEBUG(...) ESP_LOGD("SPI", __VA_ARGS__)
 
 static SpiBuffer_t* tx_buffer;
 static SpiBuffer_t* rx_buffer;
@@ -97,13 +96,13 @@ static void spi_task(void* _param) {
     xEventGroupSetBits(startUpEventGroup, START_UP_MAIN_TASK);
     while(1) {
         if (uxQueueMessagesWaiting(tx_queue) == 0) {
-            DEBUG("Waiting for events ...\n");
+            DEBUG("Waiting for events ...");
             xEventGroupWaitBits(task_event, TASK_EVENT, pdTRUE, pdTRUE, portMAX_DELAY);
         }
 
         // Check if we can send a packet
         if (xQueueReceive(tx_queue, &qPacket, 0) == pdTRUE) {
-            DEBUG("Some data to send ...\n");
+            DEBUG("Some data to send ...");
             // Set the length byte and copy the packet to the TX buffer
             const uint16_t payloadLength = qPacket.dataLength + CPX_ROUTING_PACKED_SIZE;
             tx_buffer->structuredData.dataLength = payloadLength;
@@ -115,7 +114,7 @@ static void spi_task(void* _param) {
             tx_buffer->structuredData.dataLength = 0;
         }
 
-        DEBUG("About to send %d bytes\n", tx_buffer->raw[0] | (tx_buffer->raw[1] << 8));
+        DEBUG("About to send %d bytes", tx_buffer->raw[0] | (tx_buffer->raw[1] << 8));
 
         // Trigger the transfer!
         spi_slave_transaction_t transaction = {
@@ -124,17 +123,16 @@ static void spi_task(void* _param) {
             .rx_buffer = rx_buffer->raw,
         };
 
-        DEBUG("Transaction ...\n");
+        DEBUG("Transaction set up");
         spi_slave_transmit(VSPI_HOST, &transaction, portMAX_DELAY);
 
-        DEBUG("Transferred: %dB\n", transaction.trans_len/8);
+        DEBUG("Transaction done: %dB", transaction.trans_len/8);
 
         int rx_len  = rx_buffer->structuredData.dataLength;
         DEBUG("Rx[%d]\n", rx_buffer->raw[0]);
         for (int i=0; i<rx_len; i++) {
             DEBUG(" %02x", rx_buffer->raw[i + 1]);
         }
-        DEBUG("\n");
 
         // If there is some data received, push the packet in the RX queue!
         if (rx_len != 0) {
