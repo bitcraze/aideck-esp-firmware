@@ -146,10 +146,10 @@ void router_init() {
   startUpEventGroup = xEventGroupCreate();
   xEventGroupClearBits(startUpEventGroup, START_UP_GAP8_ROUTER_RUNNING | START_UP_CF_ROUTER_RUNNING | START_UP_ESP_ROUTER_RUNNING | START_UP_WIFI_ROUTER_RUNNING);
 
-  xTaskCreate(router_from_gap8, "Router from GAP8", 10000, NULL, 1, NULL);
-  xTaskCreate(router_from_crazyflie, "Router from CF", 10000, NULL, 1, NULL);
-  xTaskCreate(router_from_esp32, "Router from ESP32", 10000, NULL, 1, NULL);
-  xTaskCreate(router_from_wifi, "Router from WIFI", 10000, NULL, 1, NULL);
+  xTaskCreate(router_from_gap8, "Router from GAP8", 5000, NULL, 1, NULL);
+  xTaskCreate(router_from_crazyflie, "Router from CF", 5000, NULL, 1, NULL);
+  xTaskCreate(router_from_esp32, "Router from ESP32", 5000, NULL, 1, NULL);
+  xTaskCreate(router_from_wifi, "Router from WIFI", 5000, NULL, 1, NULL);
 
   ESP_LOGI("ROUTER", "Waiting for tasks to start");
   xEventGroupWaitBits(startUpEventGroup,

@@ -84,7 +84,7 @@ void com_init() {
 
   startUpEventGroup = xEventGroupCreate();
   xEventGroupClearBits(startUpEventGroup, START_UP_RX_TASK);
-  xTaskCreate(com_rx, "COM RX", 10000, NULL, 1, NULL);
+  xTaskCreate(com_rx, "COM RX", 5000, NULL, 1, NULL);
   xEventGroupWaitBits(startUpEventGroup,
                       START_UP_RX_TASK,
                       pdTRUE, // Clear bits before returning

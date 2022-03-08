@@ -214,7 +214,7 @@ void uart_transport_init() {
     // Launching communication tasks
     startUpEventGroup = xEventGroupCreate();
     xEventGroupClearBits(startUpEventGroup, START_UP_RX_RUNNING | START_UP_TX_RUNNING);
-    xTaskCreate(uart_rx_task, "UART RX transport", 10000, NULL, 1, NULL);
+    xTaskCreate(uart_rx_task, "UART RX transport", 5000, NULL, 1, NULL);
     ESP_LOGI("UART", "Waiting for RX task to start");
     xEventGroupWaitBits(startUpEventGroup,
                         START_UP_RX_RUNNING,
@@ -227,7 +227,7 @@ void uart_transport_init() {
     // CTR and miss CTS (which means that the STM32 will stop sending CTS
     // too early and we cannot sync)
 
-    xTaskCreate(uart_tx_task, "UART TX transport", 10000, NULL, 1, NULL);
+    xTaskCreate(uart_tx_task, "UART TX transport", 5000, NULL, 1, NULL);
     ESP_LOGI("UART", "Waiting for TX task to start");
     xEventGroupWaitBits(startUpEventGroup,
                         START_UP_TX_RUNNING,

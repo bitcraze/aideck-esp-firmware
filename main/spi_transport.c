@@ -206,7 +206,7 @@ void spi_transport_init() {
     // Launching SPI communication task
     startUpEventGroup = xEventGroupCreate();
     xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK);
-    xTaskCreate(spi_task, "SPI transport", 10000, NULL, 1, &spi_task_handle);
+    xTaskCreate(spi_task, "SPI transport", 5000, NULL, 1, &spi_task_handle);
     ESP_LOGI("SPI", "Waiting for task to start");
     xEventGroupWaitBits(startUpEventGroup,
                         START_UP_MAIN_TASK,

@@ -99,10 +99,10 @@ static void test_rx(void* _param) {
 }
 
 void test_init() {
-  xTaskCreate(test_rx, "TEST RX", 10000, NULL, 1, NULL);
+  xTaskCreate(test_rx, "TEST RX", 5000, NULL, 1, NULL);
 
 #ifdef RUN_TESTS_FROM_ESP32
-  xTaskCreate(test_runner, "TEST runner", 10000, NULL, 1, NULL);
+  xTaskCreate(test_runner, "TEST runner", 5000, NULL, 1, NULL);
   ESP_LOGI("TEST", "Test runner initialized, will run tests");
 #endif
 
