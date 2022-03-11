@@ -147,6 +147,18 @@ void app_main(void)
 
     spi_transport_init();
 
+    const uart_config_t uart_config = {
+      .baud_rate = 115200,
+      .data_bits = UART_DATA_8_BITS,
+      .parity = UART_PARITY_DISABLE,
+      .stop_bits = UART_STOP_BITS_1,
+      .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+    };
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_1, 1000, 1000, 0, NULL, 0);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_set_pin(UART_NUM_1, 0, 25, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
     ESP_LOGI("SYS", "\n\n -- Starting up --\n");
     ESP_LOGI("SYS", "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
 

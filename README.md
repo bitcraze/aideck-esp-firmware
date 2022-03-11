@@ -4,6 +4,8 @@ This firmware is running on the ESP32 Nina W102 module of the AI-Deck. It
 implements communication with the GAP8 chip, the Crazyflie's STM32 main MCU as
 well as implementing Wifi communication.
 
+**NOTE**: The default configuration uses the NINA_SYSBOOT (IO1) as log UART TX from the ESP32.
+
 ## Compile and flash
 
 The firmware is currently designed to be flashed and run from the serial port.
