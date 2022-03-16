@@ -22,3 +22,9 @@ jobs:
 
     - name: build
       run: docker run --rm -v ${PWD}:/module bitcraze/builder bash -c "./tools/build/build"
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: ${{ github.sha }}
+        path: build/aideck_esp.bin
