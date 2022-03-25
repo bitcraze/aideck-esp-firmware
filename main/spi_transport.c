@@ -115,6 +115,8 @@ static void spi_task(void* _param) {
             tx_buffer->structuredData.dataLength = 0;
         }
 
+        rx_buffer->structuredData.dataLength = 0;
+
         DEBUG("About to send %d bytes", tx_buffer->raw[0] | (tx_buffer->raw[1] << 8));
 
         // Trigger the transfer!
