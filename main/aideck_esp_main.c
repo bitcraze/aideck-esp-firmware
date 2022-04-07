@@ -109,9 +109,14 @@
 //     printf("Done in %f ms, %f pk/s, %f B/s\n", runtime * 1000, pk_per_seconds, pk_per_seconds * ESP_TRANSPORT_MTU);
 // }
 
-int my_vprintf(const char * fmt, va_list ap) {
-    int len = vprintf("Hello: ", ap);
-    len += vprintf(fmt, ap);
+static esp_routable_packet_t txp;
+int cpx_and_uart_vprintf(const char * fmt, va_list ap) {
+    int len = vprintf(fmt, ap);
+
+    cpxInitRoute(CPX_T_ESP32, CPX_T_STM32, CPX_F_CONSOLE, &txp.route);
+    txp.dataLength = vsprintf((char*)txp.data, fmt, ap) + 1;
+    espAppSendToRouterBlocking(&txp);
+
     return len;
 }
 
@@ -132,7 +137,6 @@ void app_main(void)
     esp_log_level_set("COM", ESP_LOG_INFO);
     esp_log_level_set("TEST", ESP_LOG_INFO);
     esp_log_level_set("WIFI", ESP_LOG_INFO);
-    //esp_log_set_vprintf(my_vprintf);
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -171,6 +175,8 @@ void app_main(void)
 
     wifi_init();
     router_init();
+
+    esp_log_set_vprintf(cpx_and_uart_vprintf);
 
     system_init();
 
