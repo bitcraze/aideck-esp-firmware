@@ -427,9 +427,9 @@ void wifi_init() {
 
   startUpEventGroup = xEventGroupCreate();
   xEventGroupClearBits(startUpEventGroup, START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK | START_UP_CTRL_TASK);
-  xTaskCreate(wifi_task, "WiFi TASK", 6000, NULL, 1, NULL);
-  xTaskCreate(wifi_sending_task, "WiFi TX", 6000, NULL, 1, NULL);
-  xTaskCreate(wifi_receiving_task, "WiFi RX", 6000, NULL, 1, NULL);
+  xTaskCreate(wifi_task, "WiFi TASK", 5000, NULL, 1, NULL);
+  xTaskCreate(wifi_sending_task, "WiFi TX", 5000, NULL, 1, NULL);
+  xTaskCreate(wifi_receiving_task, "WiFi RX", 5000, NULL, 1, NULL);
   ESP_LOGI(TAG, "Waiting for main, RX and TX tasks to start");
   xEventGroupWaitBits(startUpEventGroup,
                       START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK,
