@@ -33,6 +33,7 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "discovery.h"
 
 #include "esp_transport.h"
 #include "spi_transport.h"
@@ -136,7 +137,7 @@ void app_main(void)
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-
+    esp_log_level_set("DISCOVERY", ESP_LOG_INFO);
     gpio_pad_select_gpio(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(BLINK_GPIO, 1);
@@ -157,7 +158,10 @@ void app_main(void)
     // We won't use a buffer for sending data.
     uart_driver_install(UART_NUM_1, 1000, 1000, 0, NULL, 0);
     uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, 0, 25, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(UART_NUM_1,
+                0,
+                CONFIG_ESP_CONSOLE_UART_RX_GPIO,
+                UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     ESP_LOGI("SYS", "\n\n -- Starting up --\n");
     ESP_LOGI("SYS", "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
@@ -173,6 +177,8 @@ void app_main(void)
     router_init();
 
     system_init();
+
+    discovery_init();
 
     while(1) {
         vTaskDelay(10);
