@@ -33,6 +33,7 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_event.h"
+#include "discovery.h"
 
 #include "esp_transport.h"
 #include "spi_transport.h"
@@ -140,7 +141,7 @@ void app_main(void)
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-
+    esp_log_level_set("DISCOVERY", ESP_LOG_INFO);
     gpio_pad_select_gpio(BLINK_GPIO);
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(BLINK_GPIO, 1);
@@ -179,6 +180,8 @@ void app_main(void)
     esp_log_set_vprintf(cpx_and_uart_vprintf);
 
     system_init();
+
+    discovery_init();
 
     while(1) {
         vTaskDelay(10);
