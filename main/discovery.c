@@ -35,7 +35,7 @@ void discovery_init()
 {
     esp_err_t err = mdns_init();
     if (err) {
-        ESP_LOGW("DISCOVERY", "MDNS Init failed: %d\n", err);
+        ESP_LOGW("DISCOVERY", "Init failed: %d", err);
         return;
     }
 
@@ -46,10 +46,26 @@ void discovery_init()
     snprintf(macString, sizeof(macString), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     ESP_LOGI("DISCOVERY", "Hostname is %s", hostname);
-    mdns_hostname_set(hostname);
-    mdns_instance_name_set("AI-deck");
-    mdns_service_add(NULL, "_cpx", "_tcp", 5000, NULL, 0);
-    mdns_service_instance_name_set("_cpx", "_tcp", "Crazyflie Packet eXchange");
+
+    if (mdns_hostname_set(hostname) != ESP_OK) {
+      ESP_LOGW("DISCOVERY", "Could not set hostname");
+      return;
+    }
+    
+    if (mdns_instance_name_set("AI-deck") != ESP_OK) {
+      ESP_LOGW("DISCOVERY", "Could not set instance name");
+      return;
+    }
+
+    if (mdns_service_add(NULL, "_cpx", "_tcp", 5000, NULL, 0) != ESP_OK) {
+      ESP_LOGW("DISCOVERY", "Could not add service");
+      return;
+    }
+
+    if (mdns_service_instance_name_set("_cpx", "_tcp", "Crazyflie Packet eXchange") != ESP_OK) {
+      ESP_LOGW("DISCOVERY", "Could not set service instance name");
+      return;
+    }  
 
     mdns_txt_item_t serviceTxtData[5] = {
         {"pname", "aideck"},
@@ -58,5 +74,8 @@ void discovery_init()
         {"name", ""},
         {"cpxversion", "1"}
     };
-    mdns_service_txt_set("_cpx", "_tcp", serviceTxtData, 5);
+    if (mdns_service_txt_set("_cpx", "_tcp", serviceTxtData, 5) != ESP_OK) {
+      ESP_LOGW("DISCOVERY", "Could not set txt data");
+      return;
+    }
 }
