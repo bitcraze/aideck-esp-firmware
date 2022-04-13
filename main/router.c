@@ -78,6 +78,8 @@ static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context
     if (toSend > mtu) {
       toSend = mtu;
       lastPacket = false;
+    } else {
+      lastPacket = true;
     }
 
     memcpy(txp->data, startOfDataToSend, toSend);
@@ -101,19 +103,19 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
     switch (destination) {
       case CPX_T_GAP8:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU);
+        splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
         break;
       case CPX_T_STM32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU);
+        splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
         break;
       case CPX_T_ESP32:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU);
+        splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
         break;
       case CPX_T_HOST:
         ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU);
+        splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
         break;
       default:
         ESP_LOGW("ROUTER", "Cannot route from %s [0x%02X] to [0x%02X]", routerName, source, destination);
