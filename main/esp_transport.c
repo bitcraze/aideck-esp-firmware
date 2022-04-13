@@ -66,4 +66,5 @@ void espTransportSend(const CPXRoutablePacket_t* packet) {
 void espTransportReceive(CPXRoutablePacket_t* packet) {
   esp_routable_packet_t* buf = packet;
   xQueueReceive(espTxQueue, buf, portMAX_DELAY);
+  packet->route.lastPacket = true;
 }

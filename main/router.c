@@ -78,8 +78,6 @@ static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context
     if (toSend > mtu) {
       toSend = mtu;
       lastPacket = false;
-    } else {
-      lastPacket = true;
     }
 
     memcpy(txp->data, startOfDataToSend, toSend);

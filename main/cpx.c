@@ -4,7 +4,6 @@ void cpxInitRoute(const CPXTarget_t source, const CPXTarget_t destination, const
     route->source = source;
     route->destination = destination;
     route->function = function;
-    route->lastPacket = true;
 }
 
 void cpxRouteToPacked(const CPXRouting_t* route, CPXRoutingPacked_t* packed) {
