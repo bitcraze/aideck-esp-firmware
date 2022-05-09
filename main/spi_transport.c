@@ -83,10 +83,6 @@ static IRAM_ATTR void spi_post_setup(struct spi_slave_transaction_t * _transacti
     gpio_set_level(ESP_RTT_GPIO, 1);
 }
 
-static IRAM_ATTR void  spi_transaction_started_handler(void * _param) {
-    gpio_set_level(ESP_RTT_GPIO, 0);
-}
-
 static IRAM_ATTR void spi_post_transfer(struct spi_slave_transaction_t * _transaction) {
     gpio_set_level(ESP_RTT_GPIO, 0);
 }
@@ -164,13 +160,10 @@ void spi_transport_init() {
     gpio_intr_enable(GAP_RTT_GPIO);
 
     gpio_config_t spi_cs_int_config = {
-        .intr_type = GPIO_INTR_NEGEDGE,
         .mode = GPIO_MODE_INPUT,
         .pin_bit_mask = (1ull<<SPI_CS_GPIO)
     };
     gpio_config(&spi_cs_int_config);
-    gpio_isr_handler_add(SPI_CS_GPIO, spi_transaction_started_handler, NULL);
-    gpio_intr_enable(SPI_CS_GPIO);
 
     gpio_config_t esp_rtt_conf = {
         .mode = GPIO_MODE_OUTPUT,
