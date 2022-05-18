@@ -24,9 +24,16 @@ $ idf.py monitor
 
 ### Flash using the builder image
 
-To flash the ESP using a JTAG, use:
+To build the firmware in Docker, use:
+```
+docker run --rm -it -v $PWD:/module/ --device /dev/ttyUSB0 --privileged -P bitcraze/builder /bin/bash -c "make"
+```
 
+Then, to flash the ESP using a JTAG, use:
+
+```
 docker run --rm -it -v $PWD:/module/ --device /dev/ttyUSB0 --privileged -P bitcraze/builder /bin/bash -c "openocd -f interface/ftdi/olimex-arm-usb-tiny-h.cfg -f board/esp-wroom-32.cfg -c 'adapter_khz 20000' -c 'program_esp build/bootloader/bootloader.bin 0x1000 verify' -c 'program_esp build/aideck_esp.bin 0x10000 verify reset exit'"
+```
 
 ### Flash using the cfloader
 
