@@ -10,16 +10,17 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
+    # Weekly build
     - cron: '45 15 * * 0'
   workflow_dispatch:
-  
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
 
@@ -27,7 +28,7 @@ jobs:
       run: docker run --rm -v ${PWD}:/module bitcraze/builder bash -c "./tools/build/build"
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v2.1.4
+      uses: actions/upload-artifact@v3
       with:
         name: ${{ github.sha }}
         path: build/aideck_esp.bin
