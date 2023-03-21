@@ -94,6 +94,9 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
   while(1) {
     receive(rxp);
 
+    // The version should already be checked when we receive packets. Do it again to make sure.
+    assert(CPX_VERSION == rxp->route.version);
+
     const CPXTarget_t source = rxp->route.source;
     const CPXTarget_t destination = rxp->route.destination;
     const uint16_t cpxDataLength = rxp->dataLength;
