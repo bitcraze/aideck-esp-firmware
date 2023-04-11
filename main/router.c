@@ -39,6 +39,7 @@
 #include "uart_transport.h"
 #include "esp_transport.h"
 #include "wifi.h"
+#include "state.h"
 
 typedef struct {
   CPXRoutablePacket_t txp;
@@ -95,6 +96,10 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
     receive(rxp);
 
     // The version should already be checked when we receive packets. Do it again to make sure.
+    if (CPX_VERSION != rxp->route.version)
+    {
+        set_state(STATE_ERROR);
+    }
     assert(CPX_VERSION == rxp->route.version);
 
     const CPXTarget_t source = rxp->route.source;

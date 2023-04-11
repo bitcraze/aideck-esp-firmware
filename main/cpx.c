@@ -1,4 +1,5 @@
 #include "cpx.h"
+#include "state.h"
 #include "freertos/FreeRTOS.h"
 
 void cpxInitRoute(const CPXTarget_t source, const CPXTarget_t destination, const CPXFunction_t function, CPXRouting_t* route) {
@@ -17,6 +18,10 @@ void cpxRouteToPacked(const CPXRouting_t* route, CPXRoutingPacked_t* packed) {
 }
 
 void cpxPackedToRoute(const CPXRoutingPacked_t* packed, CPXRouting_t* route) {
+    if (CPX_VERSION != packed->version)
+    {
+        set_state(STATE_ERROR);
+    }
     assert(CPX_VERSION == packed->version);
 
     route->version = packed->version;

@@ -43,6 +43,7 @@
 #include "test.h"
 #include "wifi.h"
 #include "system.h"
+#include "state.h"
 
 /* The LED is connected on GPIO */
 #define BLINK_GPIO 4
@@ -184,10 +185,24 @@ void app_main(void)
     discovery_init();
 
     while(1) {
-        vTaskDelay(10);
-        gpio_set_level(BLINK_GPIO, 1);
-        vTaskDelay(10);
-        gpio_set_level(BLINK_GPIO, 0);
+        if (get_state() == STATE_OK)
+        {
+            vTaskDelay(10);
+            gpio_set_level(BLINK_GPIO, 1);
+            vTaskDelay(10);
+            gpio_set_level(BLINK_GPIO, 0);
+        } else
+        {
+            for (uint16_t i = 0; i < 20; i++)
+            {
+                vTaskDelay(3);
+                gpio_set_level(BLINK_GPIO, 1);
+                vTaskDelay(3);
+                gpio_set_level(BLINK_GPIO, 0);
+            }
+            vTaskDelay(40);
+        }
+        
     }
     esp_restart();
 }
