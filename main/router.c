@@ -95,31 +95,33 @@ static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* 
     receive(rxp);
 
     // The version should already be checked when we receive packets. Do it again to make sure.
-    assert(CPX_VERSION == rxp->route.version);
+    if(CPX_VERSION == rxp->route.version)
+    {
+      const CPXTarget_t source = rxp->route.source;
+      const CPXTarget_t destination = rxp->route.destination;
+      const uint16_t cpxDataLength = rxp->dataLength;
 
-    const CPXTarget_t source = rxp->route.source;
-    const CPXTarget_t destination = rxp->route.destination;
-    const uint16_t cpxDataLength = rxp->dataLength;
-
-    switch (destination) {
-      case CPX_T_GAP8:
-        ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      case CPX_T_STM32:
-        ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      case CPX_T_ESP32:
-        ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      case CPX_T_WIFI_HOST:
-        ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      default:
-        ESP_LOGW("ROUTER", "Cannot route from %s [0x%02X] to [0x%02X]", routerName, source, destination);
+      switch (destination)
+      {
+        case CPX_T_GAP8:
+          ESP_LOGD("ROUTER", "%s [0x%02X] -> GAP8 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, spi_transport_send, SPI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        case CPX_T_STM32:
+          ESP_LOGD("ROUTER", "%s [0x%02X] -> STM32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, uart_transport_send, UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        case CPX_T_ESP32:
+          ESP_LOGD("ROUTER", "%s [0x%02X] -> ESP32 [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, espTransportSend, ESP_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        case CPX_T_WIFI_HOST:
+          ESP_LOGD("ROUTER", "%s [0x%02X] -> HOST [0x%02X] (%u)", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, wifi_transport_send, WIFI_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        default:
+          ESP_LOGW("ROUTER", "Cannot route from %s [0x%02X] to [0x%02X]", routerName, source, destination);
+      }
     }
   }
 }
