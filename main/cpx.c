@@ -17,11 +17,12 @@ void cpxRouteToPacked(const CPXRouting_t* route, CPXRoutingPacked_t* packed) {
 }
 
 void cpxPackedToRoute(const CPXRoutingPacked_t* packed, CPXRouting_t* route) {
-    assert(CPX_VERSION == packed->version);
-
-    route->version = packed->version;
-    route->source = packed->source;
-    route->destination = packed->destination;
-    route->function = packed->function;
-    route->lastPacket = packed->lastPacket;
+    if(CPX_VERSION == packed->version)
+    {
+        route->version = packed->version;
+        route->source = packed->source;
+        route->destination = packed->destination;
+        route->function = packed->function;
+        route->lastPacket = packed->lastPacket;
+    }
 }
