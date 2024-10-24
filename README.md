@@ -26,7 +26,7 @@ $ idf.py monitor
 
 To build the firmware in Docker, use:
 ```
-docker run --rm -it -v $PWD:/module/ --device /dev/ttyUSB0 --privileged -P bitcraze/builder /bin/bash -c "make"
+docker run --rm -it -v $PWD:/module/ --device /dev/ttyUSB0 --privileged -P bitcraze/builder /bin/bash -c "source /new_home/.espressif/python_env/idf4.3_py3.10_env/bin/activate && make"
 ```
 
 Then, to flash the ESP using a JTAG, use:
