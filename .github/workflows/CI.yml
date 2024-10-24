@@ -25,7 +25,7 @@ jobs:
         submodules: true
 
     - name: build
-      run: docker run --rm -v ${PWD}:/module bitcraze/builder bash -c "./tools/build/build"
+      run: docker run --rm -v ${PWD}:/module bitcraze/builder bash -c "source /new_home/.espressif/python_env/idf4.3_py3.10_env/bin/activate && ./tools/build/build"
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v3
