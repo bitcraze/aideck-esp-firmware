@@ -74,9 +74,9 @@ static xQueueHandle wifiTxQueue;
 static const char *TAG = "WIFI";
 
 /* Socket for receiving WiFi connections */
-static int sock = -1;
+static int serverSock = -1;
 /* Accepted WiFi connection */
-static int conn = -1;
+static int clientConnection = -1;
 
 enum {
   WIFI_CTRL_SET_SSID                = 0x10,
@@ -257,19 +257,19 @@ void wifi_bind_socket() {
   addr_family = AF_INET;
   ip_protocol = IPPROTO_IP;
   inet_ntoa_r(destAddr.sin_addr, addr_str, sizeof(addr_str) - 1);
-    sock = socket(addr_family, SOCK_STREAM, ip_protocol);
-  if (sock < 0) {
+    serverSock = socket(addr_family, SOCK_STREAM, ip_protocol);
+  if (serverSock < 0) {
     ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
   }
   ESP_LOGD(TAG, "Socket created");
 
-  int err = bind(sock, (struct sockaddr *)&destAddr, sizeof(destAddr));
+  int err = bind(serverSock, (struct sockaddr *)&destAddr, sizeof(destAddr));
   if (err != 0) {
     ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
   }
   ESP_LOGD(TAG, "Socket binded");
 
-  err = listen(sock, 1);
+  err = listen(serverSock, 1);
   if (err != 0) {
     ESP_LOGE(TAG, "Error occured during listen: errno %d", errno);
   }
@@ -280,8 +280,8 @@ void wifi_wait_for_socket_connected() {
   ESP_LOGI(TAG, "Waiting for connection");
   struct sockaddr sourceAddr;
   uint addrLen = sizeof(sourceAddr);
-  conn = accept(sock, (struct sockaddr *)&sourceAddr, &addrLen);
-  if (conn < 0) {
+  clientConnection = accept(serverSock, (struct sockaddr *)&sourceAddr, &addrLen);
+  if (clientConnection < 0) {
     ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
   }
   ESP_LOGI(TAG, "Connection accepted");
@@ -344,12 +344,13 @@ static void wifi_task(void *pvParameters) {
 }
 
 void wifi_send_packet(const char * buffer, size_t size) {
-  if (conn != -1) {
+  if (clientConnection != -1) {
     ESP_LOGD(TAG, "Sending WiFi packet of size %u", size);
-    int err = send(conn, buffer, size, 0);
+    int err = send(clientConnection, buffer, size, 0);
     if (err < 0) {
       ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-      conn = -1;
+      clientConnection = -1;
+      close(clientConnection);
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
     }
   }
@@ -379,12 +380,12 @@ static void wifi_receiving_task(void *pvParameters) {
 
   xEventGroupSetBits(startUpEventGroup, START_UP_RX_TASK);
   while (1) {
-    len = recv(conn, &rxp_wifi, 2, 0);
+    len = recv(clientConnection, &rxp_wifi, 2, 0);
     if (len > 0) {
       ESP_LOGD(TAG, "Wire data length %i", rxp_wifi.payloadLength);
       int totalRxLen = 0;
       do {
-        len = recv(conn, &rxp_wifi.payload[totalRxLen], rxp_wifi.payloadLength - totalRxLen, 0);
+        len = recv(clientConnection, &rxp_wifi.payload[totalRxLen], rxp_wifi.payloadLength - totalRxLen, 0);
         ESP_LOGD(TAG, "Read %i bytes", len);
         totalRxLen += len;
       } while (totalRxLen < rxp_wifi.payloadLength);
@@ -392,6 +393,7 @@ static void wifi_receiving_task(void *pvParameters) {
       xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
     } else if (len == 0) {
       //vTaskDelay(10);
+      close(clientConnection);
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
       //printf("No data!\n");
     } else {
