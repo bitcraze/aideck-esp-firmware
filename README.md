@@ -54,3 +54,28 @@ Just pre-pend make with tb, for instance
 `tb make`
 
 `tb make clean`
+
+
+### Debugging
+
+Conntect an Olimex Programmer (Arm-usb-Tiny-h) to the esp debug port on the deck. Make sure its powered.
+
+To start an openocd server 
+```
+openocd -f interface/ftdi/olimex-arm-usb-tiny-h.cfg -f board/esp-wroom-32.cfg -c 'adapter_khz 20000'
+```
+
+Then add a debug config in your launch.json (or create one) 
+
+    {
+      "name": "Attach to ESP32",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/aideck_esp.elf",
+      "cwd": "${workspaceFolder}",
+      "miDebuggerPath": "your_espressif_path/.espressif/tools/xtensa-esp-elf-gdb/11.2_20220823/xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb",
+      "miDebuggerServerAddress": "localhost:3333",
+      "externalConsole": false,
+      "stopAtEntry": false
+  }
+
