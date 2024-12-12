@@ -393,7 +393,8 @@ static void wifi_receiving_task(void *pvParameters) {
       xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
     } else if (len == 0) {
       //vTaskDelay(10);
-      close(clientConnection);
+      close(clientConnection); //Reading 0 bytes most often means the client has disconnected
+      clientConnection = -1;
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
       //printf("No data!\n");
     } else {
