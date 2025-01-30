@@ -28,7 +28,7 @@ jobs:
       run: docker run --rm -v ${PWD}:/module bitcraze/builder bash -c "source /new_home/.espressif/python_env/idf4.3_py3.10_env/bin/activate && ./tools/build/build"
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ github.sha }}
         path: build/aideck_esp.bin
