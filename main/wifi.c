@@ -37,7 +37,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-
+#include "driver/gpio.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
@@ -45,6 +45,7 @@
 #include "esp_netif.h"
 
 #include "com.h"
+#define BLINK_GPIO 4
 
 static esp_routable_packet_t rxp;
 static esp_routable_packet_t txp;
@@ -57,6 +58,9 @@ static char key[MAX_SSID_SIZE];
 
 static const int WIFI_CONNECTED_BIT = BIT0;
 static const int WIFI_SOCKET_DISCONNECTED = BIT1;
+static const int WIFI_SOCKET_CONNECTED = BIT2;
+static const int WIFI_PACKET_SENT =BIT3;
+static const int WIFI_PACKET_SENDING =BIT4;
 static EventGroupHandle_t s_wifi_event_group;
 
 static const int START_UP_MAIN_TASK = BIT0;
@@ -284,9 +288,12 @@ void wifi_wait_for_socket_connected() {
   ESP_LOGI(TAG, "Waiting for connection");
   struct sockaddr sourceAddr;
   uint addrLen = sizeof(sourceAddr);
+  ESP_LOGE(TAG, "Waiting for connection");
   clientConnection = accept(serverSock, (struct sockaddr *)&sourceAddr, &addrLen);
   if (clientConnection < 0) {
     ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+  } else {
+    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_CONNECTED);
   }
   ESP_LOGI(TAG, "Connection accepted");
 }
@@ -347,9 +354,32 @@ static void wifi_task(void *pvParameters) {
   }
 }
 
+void wifi_led_task(void *pvParameters)
+{
+  int ledstate = 0;
+  while(1) {
+    if(clientConnection ==-1){
+      gpio_set_level(BLINK_GPIO, !ledstate);
+      ledstate = !ledstate;
+      vTaskDelay(pdMS_TO_TICKS(500));
+    } else {
+      EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_PACKET_SENDING | WIFI_PACKET_SENT, pdFALSE,pdFALSE,portMAX_DELAY);
+      if (bits & WIFI_PACKET_SENDING) {
+        gpio_set_level(BLINK_GPIO,1);
+        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_SENDING);
+      }
+      if (bits &WIFI_PACKET_SENT ) {
+        gpio_set_level(BLINK_GPIO,0);
+        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_SENT); 
+      }
+    }
+  }
+}
+
 void wifi_send_packet(const char * buffer, size_t size) {
   if (clientConnection != -1) {
     ESP_LOGD(TAG, "Sending WiFi packet of size %u", size);
+    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENDING);
     int err = send(clientConnection, buffer, size, 0);
     if (err < 0) {
       ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
@@ -357,6 +387,9 @@ void wifi_send_packet(const char * buffer, size_t size) {
       close(clientConnection);
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
     }
+    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENT);
+  } else {
+    xEventGroupWaitBits(s_wifi_event_group, WIFI_SOCKET_CONNECTED, pdTRUE, pdFALSE, portMAX_DELAY);
   }
 }
 
@@ -437,6 +470,7 @@ void wifi_init() {
   xTaskCreate(wifi_task, "WiFi TASK", 5000, NULL, 1, NULL);
   xTaskCreate(wifi_sending_task, "WiFi TX", 5000, NULL, 1, NULL);
   xTaskCreate(wifi_receiving_task, "WiFi RX", 5000, NULL, 1, NULL);
+  xTaskCreate(wifi_led_task, "WiFi LED", 5000, NULL, 1, NULL);
   ESP_LOGI(TAG, "Waiting for main, RX and TX tasks to start");
   xEventGroupWaitBits(startUpEventGroup,
                       START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK,
