@@ -59,8 +59,8 @@ static char key[MAX_SSID_SIZE];
 static const int WIFI_CONNECTED_BIT = BIT0;
 static const int WIFI_SOCKET_DISCONNECTED = BIT1;
 static const int WIFI_SOCKET_CONNECTED = BIT2;
-static const int WIFI_PACKET_SENT =BIT3;
-static const int WIFI_PACKET_SENDING =BIT4;
+static const int WIFI_PACKET_WAIT_SEND = BIT3;
+static const int WIFI_PACKET_SENDING = BIT4;
 static EventGroupHandle_t s_wifi_event_group;
 
 static const int START_UP_MAIN_TASK = BIT0;
@@ -365,14 +365,14 @@ void wifi_led_task(void *pvParameters)
       ledstate = !ledstate;
       vTaskDelay(pdMS_TO_TICKS(500));
     } else {
-      EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_PACKET_SENDING | WIFI_PACKET_SENT, pdFALSE,pdFALSE,portMAX_DELAY);
+      EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_PACKET_SENDING | WIFI_PACKET_WAIT_SEND  , pdFALSE,pdFALSE,portMAX_DELAY);
       if (bits & WIFI_PACKET_SENDING) {
         gpio_set_level(BLINK_GPIO,1);
         xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_SENDING);
       }
-      if (bits &WIFI_PACKET_SENT ) {
+      if (bits & WIFI_PACKET_WAIT_SEND ) {
         gpio_set_level(BLINK_GPIO,0);
-        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_SENT); 
+        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
       }
     }
   }
@@ -388,8 +388,9 @@ void wifi_send_packet(const char * buffer, size_t size) {
       close(clientConnection);
       clientConnection = NO_CONNECTION;
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+
     }
-    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENT);
+    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
   } else {
     xEventGroupWaitBits(s_wifi_event_group, WIFI_SOCKET_CONNECTED, pdTRUE, pdFALSE, portMAX_DELAY);
   }
