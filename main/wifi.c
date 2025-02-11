@@ -69,6 +69,8 @@ static const int START_UP_TX_TASK = BIT2;
 static const int START_UP_CTRL_TASK = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
+
+#define NO_CONNECTION -1
 #define WIFI_HOST_QUEUE_LENGTH (2)
 
 static xQueueHandle wifiRxQueue;
@@ -80,7 +82,7 @@ static const char *TAG = "WIFI";
 /* Socket for receiving WiFi connections */
 static int serverSock = -1;
 /* Accepted WiFi connection */
-static int clientConnection = -1;
+static int clientConnection = NO_CONNECTION;
 
 enum {
   WIFI_CTRL_SET_SSID                = 0x10,
@@ -358,7 +360,7 @@ void wifi_led_task(void *pvParameters)
 {
   int ledstate = 0;
   while(1) {
-    if(clientConnection ==-1){
+    if(clientConnection == NO_CONNECTION){
       gpio_set_level(BLINK_GPIO, !ledstate);
       ledstate = !ledstate;
       vTaskDelay(pdMS_TO_TICKS(500));
@@ -377,14 +379,14 @@ void wifi_led_task(void *pvParameters)
 }
 
 void wifi_send_packet(const char * buffer, size_t size) {
-  if (clientConnection != -1) {
+  if (clientConnection != NO_CONNECTION) {
     ESP_LOGD(TAG, "Sending WiFi packet of size %u", size);
     xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENDING);
     int err = send(clientConnection, buffer, size, 0);
     if (err < 0) {
       ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-      clientConnection = -1;
       close(clientConnection);
+      clientConnection = NO_CONNECTION;
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
     }
     xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENT);
@@ -431,7 +433,7 @@ static void wifi_receiving_task(void *pvParameters) {
     } else if (len == 0) {
       //vTaskDelay(10);
       close(clientConnection); //Reading 0 bytes most often means the client has disconnected
-      clientConnection = -1;
+      clientConnection = NO_CONNECTION;
       xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
       //printf("No data!\n");
     } else {
