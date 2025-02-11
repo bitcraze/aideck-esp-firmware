@@ -58,9 +58,8 @@ static char key[MAX_SSID_SIZE];
 
 static const int WIFI_CONNECTED_BIT = BIT0;
 static const int WIFI_SOCKET_DISCONNECTED = BIT1;
-static const int WIFI_SOCKET_CONNECTED = BIT2;
-static const int WIFI_PACKET_WAIT_SEND = BIT3;
-static const int WIFI_PACKET_SENDING = BIT4;
+static const int WIFI_PACKET_WAIT_SEND = BIT2;
+static const int WIFI_PACKET_SENDING = BIT3;
 static EventGroupHandle_t s_wifi_event_group;
 
 static const int START_UP_MAIN_TASK = BIT0;
@@ -295,9 +294,8 @@ void wifi_wait_for_socket_connected() {
   if (clientConnection < 0) {
     ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
   } else {
-    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_CONNECTED);
+     ESP_LOGI(TAG, "Connection accepted");
   }
-  ESP_LOGI(TAG, "Connection accepted");
 }
 
 void wifi_wait_for_disconnect() {
@@ -391,8 +389,6 @@ void wifi_send_packet(const char * buffer, size_t size) {
 
     }
     xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
-  } else {
-    xEventGroupWaitBits(s_wifi_event_group, WIFI_SOCKET_CONNECTED, pdTRUE, pdFALSE, portMAX_DELAY);
   }
 }
 
