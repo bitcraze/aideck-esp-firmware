@@ -235,7 +235,7 @@ static void wifi_ctrl(void* _param) {
           if (rxp.data[1] == 0) {
             wifi_init_sta(ssid, key);
           } else {
-            if (strlen(key) < 8) {
+            if (0 < strlen(key) && strlen(key) < 8) {
               ESP_LOGW(TAG, "Password too short, cannot initialize AP");
             } else {
               wifi_init_softap(ssid, key);
