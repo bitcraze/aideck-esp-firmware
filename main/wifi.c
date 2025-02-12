@@ -37,7 +37,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-
+#include "driver/gpio.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
@@ -45,6 +45,7 @@
 #include "esp_netif.h"
 
 #include "com.h"
+#define BLINK_GPIO 4
 
 static esp_routable_packet_t rxp;
 static esp_routable_packet_t txp;
@@ -57,6 +58,8 @@ static char key[MAX_SSID_SIZE];
 
 static const int WIFI_CONNECTED_BIT = BIT0;
 static const int WIFI_SOCKET_DISCONNECTED = BIT1;
+static const int WIFI_PACKET_WAIT_SEND = BIT2;
+static const int WIFI_PACKET_SENDING = BIT3;
 static EventGroupHandle_t s_wifi_event_group;
 
 static const int START_UP_MAIN_TASK = BIT0;
@@ -65,6 +68,8 @@ static const int START_UP_TX_TASK = BIT2;
 static const int START_UP_CTRL_TASK = BIT3;
 static EventGroupHandle_t startUpEventGroup;
 
+
+#define NO_CONNECTION -1
 #define WIFI_HOST_QUEUE_LENGTH (2)
 
 static xQueueHandle wifiRxQueue;
@@ -76,7 +81,7 @@ static const char *TAG = "WIFI";
 /* Socket for receiving WiFi connections */
 static int serverSock = -1;
 /* Accepted WiFi connection */
-static int clientConnection = -1;
+static int clientConnection = NO_CONNECTION;
 
 enum {
   WIFI_CTRL_SET_SSID                = 0x10,
@@ -250,6 +255,13 @@ static void wifi_ctrl(void* _param) {
   }
 }
 
+static void close_client_socket()
+{
+    close(clientConnection);
+    clientConnection = NO_CONNECTION;
+    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+}
+
 void wifi_bind_socket() {
   char addr_str[128];
   int addr_family;
@@ -287,8 +299,9 @@ void wifi_wait_for_socket_connected() {
   clientConnection = accept(serverSock, (struct sockaddr *)&sourceAddr, &addrLen);
   if (clientConnection < 0) {
     ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+  } else {
+     ESP_LOGI(TAG, "Connection accepted");
   }
-  ESP_LOGI(TAG, "Connection accepted");
 }
 
 void wifi_wait_for_disconnect() {
@@ -347,16 +360,39 @@ static void wifi_task(void *pvParameters) {
   }
 }
 
+void wifi_led_task(void *pvParameters)
+{
+  int ledstate = 0;
+  while(1) {
+    if(clientConnection == NO_CONNECTION){
+      gpio_set_level(BLINK_GPIO, !ledstate);
+      ledstate = !ledstate;
+      vTaskDelay(pdMS_TO_TICKS(500));
+    } else {
+      EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_PACKET_SENDING | WIFI_PACKET_WAIT_SEND  , pdFALSE,pdFALSE,portMAX_DELAY);
+      if (bits & WIFI_PACKET_SENDING) {
+        gpio_set_level(BLINK_GPIO,1);
+        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_SENDING);
+      }
+      if (bits & WIFI_PACKET_WAIT_SEND ) {
+        gpio_set_level(BLINK_GPIO,0);
+        xEventGroupClearBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
+      }
+    }
+  }
+}
+
 void wifi_send_packet(const char * buffer, size_t size) {
-  if (clientConnection != -1) {
+  if (clientConnection != NO_CONNECTION) {
     ESP_LOGD(TAG, "Sending WiFi packet of size %u", size);
+    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_SENDING);
     int err = send(clientConnection, buffer, size, 0);
     if (err < 0) {
       ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-      clientConnection = -1;
-      close(clientConnection);
-      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+      close_client_socket();
+
     }
+    xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
   }
 }
 
@@ -396,11 +432,7 @@ static void wifi_receiving_task(void *pvParameters) {
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
       xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
     } else if (len == 0) {
-      //vTaskDelay(10);
-      close(clientConnection); //Reading 0 bytes most often means the client has disconnected
-      clientConnection = -1;
-      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
-      //printf("No data!\n");
+      close_client_socket();  //Reading 0 bytes most often means the client has disconnected.
     } else {
       vTaskDelay(10);
     }
@@ -437,6 +469,7 @@ void wifi_init() {
   xTaskCreate(wifi_task, "WiFi TASK", 5000, NULL, 1, NULL);
   xTaskCreate(wifi_sending_task, "WiFi TX", 5000, NULL, 1, NULL);
   xTaskCreate(wifi_receiving_task, "WiFi RX", 5000, NULL, 1, NULL);
+  xTaskCreate(wifi_led_task, "WiFi LED", 5000, NULL, 1, NULL);
   ESP_LOGI(TAG, "Waiting for main, RX and TX tasks to start");
   xEventGroupWaitBits(startUpEventGroup,
                       START_UP_MAIN_TASK | START_UP_RX_TASK | START_UP_TX_TASK,

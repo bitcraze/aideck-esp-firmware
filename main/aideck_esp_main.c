@@ -184,10 +184,8 @@ void app_main(void)
     discovery_init();
 
     while(1) {
-        vTaskDelay(10);
-        gpio_set_level(BLINK_GPIO, 1);
-        vTaskDelay(10);
-        gpio_set_level(BLINK_GPIO, 0);
+        vTaskDelay(20);
+
     }
     esp_restart();
 }
