@@ -255,6 +255,13 @@ static void wifi_ctrl(void* _param) {
   }
 }
 
+static void close_client_socket()
+{
+    close(clientConnection);
+    clientConnection = NO_CONNECTION;
+    xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+}
+
 void wifi_bind_socket() {
   char addr_str[128];
   int addr_family;
@@ -289,7 +296,6 @@ void wifi_wait_for_socket_connected() {
   ESP_LOGI(TAG, "Waiting for connection");
   struct sockaddr sourceAddr;
   uint addrLen = sizeof(sourceAddr);
-  ESP_LOGE(TAG, "Waiting for connection");
   clientConnection = accept(serverSock, (struct sockaddr *)&sourceAddr, &addrLen);
   if (clientConnection < 0) {
     ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
@@ -383,9 +389,7 @@ void wifi_send_packet(const char * buffer, size_t size) {
     int err = send(clientConnection, buffer, size, 0);
     if (err < 0) {
       ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-      close(clientConnection);
-      clientConnection = NO_CONNECTION;
-      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
+      close_client_socket();
 
     }
     xEventGroupSetBits(s_wifi_event_group, WIFI_PACKET_WAIT_SEND);
@@ -428,11 +432,7 @@ static void wifi_receiving_task(void *pvParameters) {
       ESP_LOG_BUFFER_HEX_LEVEL(TAG, &rxp_wifi, 10, ESP_LOG_DEBUG);
       xQueueSend(wifiRxQueue, &rxp_wifi, portMAX_DELAY);
     } else if (len == 0) {
-      //vTaskDelay(10);
-      close(clientConnection); //Reading 0 bytes most often means the client has disconnected
-      clientConnection = NO_CONNECTION;
-      xEventGroupSetBits(s_wifi_event_group, WIFI_SOCKET_DISCONNECTED);
-      //printf("No data!\n");
+      close_client_socket();  //Reading 0 bytes most often means the client has disconnected.
     } else {
       vTaskDelay(10);
     }
